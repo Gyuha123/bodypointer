@@ -690,6 +690,7 @@ class SettingsPage(QWidget):
         delete.clicked.connect(self._delete_all)
         priv.add(row(delete, None))
         lay.addWidget(priv)
+        self.toggles["remote_nod_click"] = self._nod_toggle
         for k, t in self.toggles.items():
             t.toggled.connect(lambda v, key=k: app.update(key, v))
 
