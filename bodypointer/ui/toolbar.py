@@ -110,7 +110,8 @@ class Toolbar(FloatingPanel):
     def set_collapsed(self, collapsed: bool, emit=False):
         self.collapsed = collapsed
         self.body.setVisible(not collapsed)
-        self.collapse_btn.setText("펼치기" if collapsed else "접기")
+        self.collapse_btn.setText("열기" if collapsed else "접기")
+        self.collapse_btn.setToolTip("툴바 펼치기" if collapsed else "툴바 접기 (재개/정지만 남김)")
         self.collapse_btn.set_icon_name("down" if collapsed else "up")
         self.place()
         if emit:
