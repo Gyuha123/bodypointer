@@ -30,6 +30,7 @@ class Settings:
     dwell_time: float = 1.0          # 0.5~3.0
     dwell_radius: float = 35         # px
     dwell_popup: bool = True         # Dwell 시 클릭 종류 메뉴 표시 (FR-31)
+    tremor_assist: bool = True       # 떨림 클릭 보조: 잠깐 튀어도 게이지 유지 + 게이지가 차면 커서 붙잡기
     click_type: str = "left"         # 팝업을 끈 경우 기본 동작
     edge_scroll: bool = False        # 화면 위/아래 가장자리 스크롤 (FR-33)
     camera_index: int = 0
