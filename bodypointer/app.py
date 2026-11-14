@@ -573,7 +573,7 @@ class App(QObject):
         if self.calib_dialog is None:
             dlg = QDialog(self.window)
             dlg.setWindowTitle("가동 범위 측정")
-            dlg.resize(1180, 680)
+            fit_to_screen(dlg, 1180, 680)
             lay = QHBoxLayout(dlg)
             lay.setContentsMargins(24, 24, 24, 24)
             lay.setSpacing(18)

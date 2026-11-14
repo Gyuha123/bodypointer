@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QComboBox, QDialog, QGridLayout, QHBoxLayout, QPr
 from ..parts import get_part
 from .calibration import CalibrationWidget
 from .preview import CameraPreview
-from .widgets import Card, IconButton, IconLabel, ToggleRow, label
+from .widgets import Card, IconButton, IconLabel, ToggleRow, fit_to_screen, label
 
 QUICK_PARTS = ["nose", "chin", "r_index", "l_index", "r_palm", "l_palm",
                "r_shoulder", "l_shoulder", "r_elbow", "l_elbow", "r_foot", "l_foot"]
@@ -27,7 +27,7 @@ class SetupWizard(QDialog):
         super().__init__(parent)
         self.app = app
         self.setWindowTitle("BodyPointer 시작하기")
-        self.resize(1180, 860)
+        fit_to_screen(self, 1180, 860)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(36, 28, 36, 28)

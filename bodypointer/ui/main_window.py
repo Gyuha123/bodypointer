@@ -13,7 +13,8 @@ from ..parts import PARTS, get_part
 from . import theme
 from .charts import BarChart, HBarChart, HeatMap, LineChart
 from .preview import CameraPreview
-from .widgets import Card, IconButton, IconLabel, Meter, Segmented, SliderRow, ToggleRow, label, set_prop
+from .widgets import (Card, IconButton, IconLabel, Meter, Segmented, SliderRow, ToggleRow, fit_to_screen, label,
+                      set_prop)
 
 NAV = [("home", "home", "홈"), ("parts", "person", "부위"), ("move", "mouse", "움직임"), ("click", "touch", "클릭"),
        ("gesture", "emoji", "제스처"), ("stats", "chart", "기록"), ("insights", "bulb", "추천"),
