@@ -43,6 +43,11 @@ class Settings:
     gesture_thresholds: dict = field(default_factory=dict)   # '내 표정으로 맞추기' 결과
     toolbar_collapsed: bool = False
     saved_links: list = field(default_factory=list)          # 제스처에 연결할 수 있게 저장한 링크 동작 id
+    # 머리 센서 리모컨
+    remote_mode: str = "auto"        # auto: 카메라가 약할 때 자동 전환 / always: 항상 머리 센서 / off
+    remote_speed: float = 1.0        # 머리를 돌린 만큼 커서가 가는 배율
+    remote_axes: dict | None = None  # 방향 맞추기 결과 {"x": [축, 부호], "y": [축, 부호]}
+    remote_nod_click: bool = False   # 고개 끄덕 = 클릭
     quick_actions: list = field(default_factory=list)   # 직접 고정한 빠른 실행
     auto_quick: bool = True          # 자주 쓴 기능을 툴바에 자동 추가
     dismissed_recs: list = field(default_factory=list)
