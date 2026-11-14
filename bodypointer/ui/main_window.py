@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QButtonGroup, QComboBox, QFrame, QGridLayout, QHB
                                QMainWindow, QMessageBox, QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout,
                                QWidget)
 
-from ..actions import ACTIONS, get_action
+from ..actions import ACTIONS, GROUP_ORDER, get_action
 from ..gestures import GESTURE_ORDER, GESTURES
 from ..insights import aggregate, headline_stats, recommend
 from ..parts import PARTS, get_part
