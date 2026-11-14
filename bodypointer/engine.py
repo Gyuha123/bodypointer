@@ -64,6 +64,7 @@ class Engine:
         m.calib = Calibration.from_list(s.calibrations.get(s.part_id))
         self.dwell.dwell_time = s.dwell_time
         self.dwell.radius = s.dwell_radius
+        self.dwell.grace = 0.4 if getattr(s, "tremor_assist", False) else 0.0
         m.reset(cursor=self.pos)
 
     def set_calibration(self, calib: Calibration):
