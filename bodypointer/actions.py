@@ -118,6 +118,11 @@ GESTURE_ONLY = {a.id for a in ACTIONS.values() if a.kind == "hold"}
 
 
 def get_action(action_id: str) -> Action | None:
+    if action_id == "link":                 # 사용 기록용 묶음 이름 (주소는 기록하지 않음)
+        return Action("link", "링크 열기", "globe", "link", group="링크")
+    if action_id.startswith(LINK_PREFIX):
+        lp = link_parts(action_id)
+        return Action(action_id, f"{lp[0]} 열기", "globe", "link", group="링크") if lp else None
     if action_id.startswith("macro:"):
         parts = [ACTIONS[p] for p in action_id[6:].split("+") if p in ACTIONS]
         if not parts:
