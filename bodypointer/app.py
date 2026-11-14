@@ -39,7 +39,7 @@ C_A = winmouse.MOD_CONTROL | winmouse.MOD_ALT
 HOTKEYS = {
     "pause": (0, winmouse.VK_PAUSE), "pause2": (C_A, ord("P")), "next": (C_A, ord("N")),
     "clutch": (C_A, ord("C")), "control": (C_A, ord("M")), "settings": (C_A, ord("S")),
-    "keyboard": (C_A, ord("K")), "quit": (C_A, ord("Q")),
+    "keyboard": (C_A, ord("K")), "quit": (C_A, ord("Q")), "remote": (C_A, ord("R")),
 }
 THEME_KEYS = {"high_contrast", "large_text"}
 SLIDER_KEYS = {"filter_strength", "sensitivity", "rel_gain", "accel", "dwell_time", "dwell_radius",
@@ -716,6 +716,10 @@ class App(QObject):
             self.toggle_keyboard()
         elif name == "quit":
             self.quit()
+        elif name == "remote":
+            # 머리 센서 ↔ 카메라 빠른 전환 (불을 끄기 전 등)
+            self.update("remote_mode", "auto" if self.settings.remote_mode == "always" else "always")
+            self.banner.flash("항상 머리 센서로 움직여요" if self.settings.remote_mode == "always" else "카메라가 약할 때만 머리 센서를 써요", "info", 2500)
 
     def _popup_chosen(self, key):
         if key == "cancel":

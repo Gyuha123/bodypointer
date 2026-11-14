@@ -698,7 +698,7 @@ class SettingsPage(QWidget):
         for k, d in [("Pause  또는  Ctrl+Alt+P", "클릭 멈추기 / 다시 시작"), ("Ctrl+Alt+K", "키보드 열기 / 닫기"),
                      ("Ctrl+Alt+N", "다음 즐겨찾기 부위"), ("Ctrl+Alt+M", "카메라 커서 끄기 / 켜기"),
                      ("Ctrl+Alt+C", "커서 고정 (상대 모드)"), ("Ctrl+Alt+S", "이 창 열기"),
-                     ("Ctrl+Alt+Q", "프로그램 종료")]:
+                     ("Ctrl+Alt+Q", "프로그램 종료"), ("Ctrl+Alt+R", "머리 센서 ↔ 카메라 전환")]:
             keys.add(row(label(k, "h2"), None, label(d, "muted")))
         lay.addWidget(keys)
         lay.addStretch()
@@ -726,6 +726,13 @@ class SettingsPage(QWidget):
         self.cam.setCurrentIndex(max(0, self.cam.findData(s.camera_index)))
         for k, t in self.toggles.items():
             t.set_checked(getattr(s, k))
+        self.remote_mode.set_current(s.remote_mode)
+        self.remote_speed.set_value(s.remote_speed)
+        if hasattr(app, "remote"):
+            self.set_remote_status(app.remote_status_text())
+
+    def set_remote_status(self, text):
+        self.remote_status.setText(f"상태: {text}")
 
 
 # =========================== 창 ===========================
