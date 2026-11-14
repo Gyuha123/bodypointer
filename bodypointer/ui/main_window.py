@@ -339,30 +339,46 @@ class GesturePage(QWidget):
     def __init__(self, app):
         super().__init__()
         self.app = app
-        outer, lay = page("제스처", "표정으로 자주 쓰는 기능을 바로 실행해요. 얼굴이 카메라에 보이면 어떤 부위를 쓰든 동작해요.")
+        outer, lay = page("제스처", "표정으로 클릭·드래그·스크롤 같은 기능을 바로 써요. 얼굴이 카메라에 보이면 어떤 부위로 "
+                                   "커서를 움직이든 동작해요.")
         QVBoxLayout(self).addWidget(outer)
         self.layout().setContentsMargins(0, 0, 0, 0)
 
-        card = Card("내 제스처", "막대가 세로선을 넘으면 인식돼요. 지금 표정을 지어 보며 확인하세요.")
-        self.meters, self.combos = {}, {}
-        choices = [("", "사용 안 함")] + [(a.id, a.label) for a in ACTIONS.values()]
+        start = Card("빠르게 시작", tone="accent")
+        start.add(label("처음이라면 추천 세트를 적용해 보세요.  눈썹 올리기 = 클릭  ·  입 벌리기 = 꾹 누르기(드래그)  ·  "
+                        "활짝 웃기 = 스크롤  ·  눈 지그시 감기 = 키보드", "muted", wrap=True))
+        preset = IconButton("check", "추천 세트 한 번에 적용", "primary")
+        preset.clicked.connect(app.apply_gesture_preset)
+        clear = IconButton("delete", "모두 해제", "ghost")
+        clear.clicked.connect(app.clear_gestures)
+        start.add(row(preset, clear, None))
+        start.add(label("‘표정 유지하는 동안’ 동작: 표정을 짓고 있는 동안만 이어져요. 예를 들어 입을 벌린 채 커서를 움직이면 "
+                        "끌기(드래그), 웃는 채 위·아래로 움직이면 스크롤(마우스 휠을 누른 것처럼)돼요. 표정을 풀면 끝나요.",
+                        "small", wrap=True))
+        lay.addWidget(start)
+
+        card = Card("내 제스처", "막대가 세로선을 넘으면 인식돼요. 표정을 지어 보며 확인하고, 잘 안 되면 ‘내 표정으로 맞추기’를 눌러 보세요.")
+        self.meters, self.combos, self.status, self.cal_btns = {}, {}, {}, {}
         for gid in GESTURE_ORDER:
             g = GESTURES[gid]
             r = QGridLayout()
             r.setHorizontalSpacing(16)
+            r.setVerticalSpacing(4)
             r.addWidget(label(g.label, "h2"), 0, 0)
             r.addWidget(label(g.hint, "small"), 1, 0)
             m = Meter()
-            r.addWidget(m, 0, 1, 2, 1)
-            cb = QComboBox()
-            for aid, text in choices:
-                cb.addItem(text, aid)
-            cb.setMinimumWidth(220)
-            cb.activated.connect(lambda _=False, x=gid, c=cb: app.bind_gesture(x, c.currentData()))
+            r.addWidget(m, 0, 1)
+            st = label("", "small")
+            r.addWidget(st, 1, 1)
+            cb = self._action_combo()
+            cb.activated.connect(lambda _=False, x=gid, c=cb: c.currentData() is not None and app.bind_gesture(x, c.currentData()))
             r.addWidget(cb, 0, 2, 2, 1)
+            cal = IconButton("emoji", "내 표정으로 맞추기", "ghost", icon_size=18)
+            cal.clicked.connect(lambda _=False, x=gid: app.start_gesture_calibration(x))
+            r.addWidget(cal, 0, 3, 2, 1)
             r.setColumnStretch(1, 1)
             card.add(r)
-            self.meters[gid], self.combos[gid] = m, cb
+            self.meters[gid], self.combos[gid], self.status[gid], self.cal_btns[gid] = m, cb, st, cal
         lay.addWidget(card)
 
         sens = Card("인식 민감도")
