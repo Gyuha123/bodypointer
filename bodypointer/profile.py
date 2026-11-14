@@ -35,7 +35,7 @@ class Settings:
     calibrations: dict = field(default_factory=dict)   # part_id -> [min_x, max_x, min_y, max_y]
     roi_box: list | None = None      # 사용자 지정 영역 [x, y, w, h] 정규화
     # 키보드 바
-    kb_dwell_time: float = 0.8       # 키 위에서 머무는 시간
+    kb_dwell_time: float = 1.2       # 키 위에서 머무는 시간
     learn_words: bool = True         # 입력한 단어를 자동완성에 학습
     # 개인화
     gestures: dict = field(default_factory=dict)        # 제스처 id -> 동작 id
