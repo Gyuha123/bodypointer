@@ -57,6 +57,11 @@ class Settings:
     @classmethod
     def from_dict(cls, d: dict) -> "Settings":
         names = {f.name for f in fields(cls)}
+        d = dict(d)
+        if d and d.get("version", 1) < 2:
+            # v2: 키보드 머무는 시간이 너무 짧아 누르기 어렵다는 의견 → 최소 1.2초로 한 번 올린다
+            d["kb_dwell_time"] = max(float(d.get("kb_dwell_time", 1.2)), 1.2)
+        d["version"] = SETTINGS_VERSION
         return cls(**{k: v for k, v in d.items() if k in names})
 
 
