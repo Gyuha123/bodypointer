@@ -138,6 +138,29 @@ class GestureTest(unittest.TestCase):
         self.assertEqual(ev, [("brow_raise", "tap")])
 
 
+class LinkTest(unittest.TestCase):
+    def test_normalize(self):
+        self.assertEqual(normalize_url("youtube.com"), "https://youtube.com")
+        self.assertEqual(normalize_url(" https://www.naver.com/search?q=1 "), "https://www.naver.com/search?q=1")
+        self.assertEqual(normalize_url("http://192.168.0.10:8080/a"), "http://192.168.0.10:8080/a")
+        for bad in ["", "hello", "file:///C:/Windows/system32/calc.exe", "javascript:alert(1)", "mailto:a@b.com",
+                    r"C:\Windows\notepad.exe", "ftp://x.com", "naver .com"]:
+            self.assertIsNone(normalize_url(bad), bad)
+
+    def test_action_roundtrip(self):
+        aid = make_link_action("유튜브", "https://www.youtube.com")
+        self.assertEqual(link_parts(aid), ("유튜브", "https://www.youtube.com"))
+        self.assertEqual(get_action(aid).label, "유튜브 열기")
+        self.assertEqual(get_action(aid).kind, "link")
+        self.assertEqual(link_parts(make_link_action("", "https://www.daum.net"))[0], "daum.net")   # 이름 없으면 도메인
+        self.assertIsNone(get_action("link:나쁜\tfile:///C:/x.exe"))                              # 저장 파일이 조작돼도 거부
+
+    def test_link_not_recorded_with_url(self):
+        r = SessionRecorder()
+        r.on_action("link", "gesture")
+        self.assertNotIn("youtube", str(r.summary()))
+
+
 class UsageAndInsightsTest(unittest.TestCase):
     def _session(self):
         r = SessionRecorder()
