@@ -2,3 +2,4 @@
 opencv-contrib-python>=4.9   # 사용자 지정 영역 CSRT 추적
 PySide6>=6.6                 # UI + QtWebEngine + QtTextToSpeech
 numpy>=1.26
+pyserial>=3.5                # 머리 센서 리모컨 (ESP32, 블루투스 SPP/USB)
