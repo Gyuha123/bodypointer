@@ -114,7 +114,7 @@ class GestureTest(unittest.TestCase):
         ev += g.update({"mouthSmileLeft": 0.62, "mouthSmileRight": 0.62}, 1.05, modes)   # 살짝 약해져도 유지
         self.assertEqual(len(ev), 1)
         for i in range(10):
-            ev += g.update({}, 1.1 + i / 30, modes) if False else g.update({"mouthSmileLeft": 0.0}, 1.1 + i / 30, modes)
+            ev += g.update({"mouthSmileLeft": 0.0}, 1.1 + i / 30, modes)     # 표정을 풂
         self.assertEqual(ev[-1], ("smile", "end"))
 
     def test_face_lost_releases_hold(self):
