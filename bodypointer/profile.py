@@ -42,6 +42,7 @@ class Settings:
     gesture_sensitivity: float = 1.0
     gesture_thresholds: dict = field(default_factory=dict)   # '내 표정으로 맞추기' 결과
     toolbar_collapsed: bool = False
+    saved_links: list = field(default_factory=list)          # 제스처에 연결할 수 있게 저장한 링크 동작 id
     quick_actions: list = field(default_factory=list)   # 직접 고정한 빠른 실행
     auto_quick: bool = True          # 자주 쓴 기능을 툴바에 자동 추가
     dismissed_recs: list = field(default_factory=list)

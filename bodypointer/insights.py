@@ -52,7 +52,7 @@ def aggregate(sessions: list[dict]) -> dict:
 def auto_quick_actions(sessions: list[dict], k: int = 3) -> list[str]:
     """툴바에 자동으로 올릴 자주 쓴 기능."""
     agg = aggregate(sessions)
-    skip = {"toggle_keyboard", "toggle_pause", "backspace", "enter", "left", "right", "up", "down"}
+    skip = {"toggle_keyboard", "toggle_pause", "backspace", "enter", "left", "right", "up", "down", "link"}
     return [a for a, n in agg["actions"].most_common() if n >= 3 and a not in skip and get_action(a)][:k]
 
 
@@ -66,7 +66,7 @@ def recommend(sessions: list[dict], settings) -> list[Rec]:
     free_gestures = [g for g in GESTURE_ORDER if g not in settings.gestures]
 
     # 1. 자주 쓰는 기능 → 개인 제스처로 등록 제안
-    skip = {"toggle_keyboard", "backspace", "left", "right", "up", "down"}
+    skip = {"toggle_keyboard", "backspace", "left", "right", "up", "down", "link"}
     for action_id, n in agg["actions"].most_common(6):
         if n < 5 or action_id in bound or action_id in skip or not free_gestures:
             continue
