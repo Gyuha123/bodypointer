@@ -891,5 +891,22 @@ class App(QObject):
             self.engine._end_modes()          # 누르고 있던 마우스 버튼 놓기
             self.hotkeys.stop()
         finally:
-            # 내장 웹 엔진이 종료 중 멈추는 경우가 있어, 저장을 마친 뒤 프로세스를 확실히 끝낸다
-            os._exit(0)
+            hard_exit()
+
+
+def hard_exit():
+    """저장을 마친 뒤 이 프로세스와 웹 엔진 하위 프로세스를 한꺼번에 끝낸다.
+
+    Windows에서 os._exit/정상 종료는 DLL 정리 루틴을 돌리는데, 내장 Chromium(Qt WebEngine)이
+    거기서 멈춰 창이 남거나 QtWebEngineProcess가 고아로 남는 문제가 있었다.
+    """
+    import ctypes
+    import subprocess
+    try:
+        subprocess.Popen(["taskkill", "/F", "/T", "/PID", str(os.getpid())],
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(3)                       # taskkill이 트리를 끝내는 동안 대기
+    finally:
+        k = ctypes.windll.kernel32           # 그래도 살아 있으면 DLL 정리 없이 즉시 종료
+        k.TerminateProcess(k.GetCurrentProcess(), 0)
