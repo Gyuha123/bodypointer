@@ -8,7 +8,7 @@ from PySide6.QtCore import QLocale, QObject, QPoint, QTimer, Signal
 from PySide6.QtWidgets import QAbstractButton, QApplication, QDialog, QHBoxLayout, QMessageBox, QVBoxLayout
 
 from . import profile, vision, winmouse
-from .actions import ALLOWED_WHILE_PAUSED, get_action, macro_steps
+from .actions import ALLOWED_WHILE_PAUSED, GESTURE_ONLY, get_action, macro_steps
 from .engine import Engine
 from .gestures import GESTURES, GestureDetector
 from .insights import auto_quick_actions, recommend
@@ -313,20 +313,15 @@ class App(QObject):
             self._status_t = t
             self._update_status(res)
 
-    def _hover_scroll(self, t):
-        """툴바 위/아래 버튼 위에 있는 동안 계속 스크롤 (가상 스크롤 버튼, FR-33)."""
+    def _toolbar_scroll(self):
+        """툴바 '스크롤': 마지막으로 클릭한 곳(없으면 화면 가운데)에서 스크롤 모드 시작/끝."""
         e = self.engine
-        btn = None
-        if not e.lost and self.toolbar.isVisible():
-            child = self.toolbar.childAt(self.toolbar.mapFromGlobal(self.logical(e.pos)))
-            btn = child if child in self.toolbar.scroll_buttons else None
-        cur, since, last = self._hover
-        if btn is not cur:
-            self._hover = (btn, t, 0.0)
+        if e.scroll_anchor is not None:
+            e.stop_scroll()
             return
-        if btn is not None and t - since > 0.4 and t - last > 0.15:
-            e.scroll_last_target(self.toolbar.scroll_buttons[btn])
-            self._hover = (btn, since, t)
+        anchor = e.last_target or (e.w / 2, e.h / 2)
+        winmouse.move(*anchor)
+        e.start_scroll(anchor, manual=False)
 
     def _update_ring(self, calibrating=False):
         e = self.engine
@@ -363,7 +358,9 @@ class App(QObject):
 
     def _live_update(self):
         if self.window.isVisible() and self.window.current_page() == "gesture":
-            self.window.pages["gesture"].update_live(self.gesture_detector)
+            status = {self._gcal["gid"]: self._gcal["text"]} if self._gcal else {}
+            status.update(self._gcal_result)
+            self.window.pages["gesture"].update_live(self.gesture_detector, time.monotonic(), status)
 
     def _on_status(self, msg: str):
         if "끊겼" in msg or "찾을 수 없" in msg or "오류" in msg or "못했" in msg:
@@ -396,6 +393,10 @@ class App(QObject):
             elif step in ("click", "double_click", "right_click"):
                 self.engine.perform({"click": "left", "double_click": "double", "right_click": "right"}[step],
                                     self.engine.pos)
+            elif step == "drag_toggle":
+                self.engine.release_hold() if self.engine.drag_active else self.engine.press_hold()
+            elif step == "scroll_toggle":
+                self.engine.stop_scroll() if self.engine.scroll_anchor is not None else self.engine.start_scroll()
             elif step == "toggle_pause":
                 self.toggle_pause()
             elif step == "toggle_keyboard":
@@ -404,17 +405,90 @@ class App(QObject):
                 self.next_part()
         self.recorder.on_action(action_id, source)
 
-    def _gesture_fired(self, gid):
+    def _gesture_event(self, gid, event):
+        """event: tap(한 번) / start(표정 시작) / end(표정 풂)."""
         aid = self.settings.gestures.get(gid)
-        if not aid:
+        a = get_action(aid) if aid else None
+        e = self.engine
+        if event == "end":
+            # 유지형 동작 끝: 끌던 것을 놓거나 스크롤을 멈춘다 (일시정지 중이어도 항상 정리)
+            if aid in ("drag_hold", None) and e.drag_active and e._drag_manual:
+                e.release_hold()
+            if aid in ("scroll_hold", None) and e.scroll_anchor is not None and e._scroll_manual:
+                e.stop_scroll()
             return
-        a = get_action(aid)
+        if a is None:
+            return
         self.recorder.on_gesture(gid)
-        if self.engine.paused and aid not in ALLOWED_WHILE_PAUSED:
+        if e.paused and aid not in ALLOWED_WHILE_PAUSED:
             self.banner.flash(f"{GESTURES[gid].label} — 클릭이 멈춰 있어 실행하지 않았어요", "info", 1500)
+            return
+        if e.lost:
+            return
+        if event == "start":
+            if aid == "drag_hold":
+                e.press_hold()
+            elif aid == "scroll_hold":
+                e.start_scroll()
+            self.recorder.on_action(aid, "gesture")
             return
         self.banner.flash(f"{GESTURES[gid].label}  →  {a.label}", "ok", 1300)
         self.run_action(aid, "gesture")
+
+    # ---------- 제스처 설정 편의 ----------
+    def apply_gesture_preset(self):
+        self.settings.gestures = dict(PRESET)
+        self._update_sources()
+        self.window.refresh()
+        self._save_timer.start()
+        self.banner.flash("추천 제스처를 적용했어요 — 표정을 지어 확인해 보세요", "ok", 2500)
+
+    def clear_gestures(self):
+        self._release_gesture_modes()
+        self.settings.gestures = {}
+        self._update_sources()
+        self.window.refresh()
+        self._save_timer.start()
+
+    def _release_gesture_modes(self):
+        for gid, ev in self.gesture_detector.release_all():
+            self._gesture_event(gid, ev)
+
+    def start_gesture_calibration(self, gid):
+        """내 표정으로 맞추기: 1.5초 편히 → 3초 표정 짓기 → 그 사람에게 맞는 기준 저장."""
+        if self._gcal is not None:
+            return
+        self._release_gesture_modes()
+        self._gcal_result.pop(gid, None)
+        self._update_sources(force_face=True)
+        g = GESTURES[gid]
+        self._gcal = {"gid": gid, "scores": [], "rest": None, "text": "편하게 가만히 있어 주세요…"}
+        self.say("편하게 가만히 있어 주세요")
+
+        def peak_phase():
+            self._gcal["rest"] = self._gcal["scores"]
+            self._gcal["scores"] = []
+            self._gcal["text"] = f"지금 ‘{g.label}’ 표정을 크게 지어 주세요!"
+            self.say(f"{g.label}")
+
+        def finish():
+            cal, self._gcal = self._gcal, None
+            th = personal_threshold(cal["rest"] or [], cal["scores"])
+            if th is None:
+                self._gcal_result[gid] = "구분이 잘 안 됐어요. 얼굴이 잘 보이게 하고 다시 해 보세요"
+                self.say("다시 해 보세요")
+            else:
+                self.settings.gesture_thresholds[gid] = th
+                self.gesture_detector.personal[gid] = th
+                self._gcal_result[gid] = "내 표정에 맞췄어요!"
+                self.say("맞췄습니다")
+                self._save_timer.start()
+            QTimer.singleShot(4000, lambda: self._gcal_result.pop(gid, None))
+            self._update_sources()
+            self.window.refresh()
+
+        QTimer.singleShot(1500, peak_phase)
+        QTimer.singleShot(4500, finish)
 
     def _word_typed(self, word, prev):
         if self.settings.learn_words:
