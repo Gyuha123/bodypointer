@@ -294,9 +294,17 @@ class Engine:
             if self._speed > self.UNLOCK_DRIFT or math.dist(self.pos, d.anchor) > d.radius * 0.75:
                 self._locked = False
         elif d.progress >= self.LOCK_AT and self._speed < self.LOCK_DRIFT \
+                and self._recent_speed(t) < 45.0 \
                 and math.dist(self.pos, d.anchor) < max(6.0, d.radius * 0.15):
-            # 이미 기준점 바로 근처에 있을 때만 붙잡는다 → 붙잡는 순간 커서가 당겨지지 않는다
+            # 멈춰 있고(최근 0.15초도), 기준점 바로 근처일 때만 붙잡는다 → 막 움직이기 시작할 때 당겨지지 않는다
             self._locked = True
+
+    def _recent_speed(self, t, window=0.15):
+        """최근 window초 동안의 순이동 속도 (움직이기 시작한 것을 빨리 알아채기 위함)."""
+        for tt, p in reversed(self._hist):
+            if t - tt >= window:
+                return math.dist(self.pos, p) / (t - tt)
+        return 0.0
 
     @property
     def locked_pos(self):
