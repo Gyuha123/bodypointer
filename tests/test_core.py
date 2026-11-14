@@ -197,6 +197,30 @@ class EngineTest(unittest.TestCase):
         self.assertEqual(self.mouse.pos, (100, 100))
         self.assertEqual(self.mouse.count("left_click"), 0)
 
+    def test_gesture_hold_drag_not_released_by_dwell(self):
+        self.e.set_paused(False)
+        self.run_still(0.3)
+        self.e.press_hold()                        # 입 벌리기 시작 → 꾹 누름
+        self.run_still(2.5, (0.6, 0.6))            # 오래 머물러도 머무르기가 버튼을 놓지 않음
+        self.assertTrue(self.e.drag_active)
+        self.assertEqual(self.mouse.count("left_up"), 0)
+        self.e.release_hold()                      # 표정 풂 → 놓기
+        self.assertEqual(self.mouse.count("left_up"), 1)
+        self.run_still(1.5, (0.6, 0.6))            # 놓은 자리에서 바로 클릭되지 않음
+        self.assertEqual(self.mouse.count("left_click"), 0)
+
+    def test_gesture_scroll_stays_until_released(self):
+        self.e.set_paused(False)
+        self.run_still(0.3)
+        self.e.start_scroll()                      # 웃기 시작 → 휠 누른 듯 스크롤 모드
+        self.run_still(4.0)                        # 가운데 오래 있어도 끝나지 않음 (수동 모드)
+        self.assertIsNotNone(self.e.scroll_anchor)
+        self.run_still(0.5, (0.5, 0.2))            # 위로 → 위로 스크롤
+        wheels = [c[1][0] for c in self.mouse.calls if c[0] == "wheel"]
+        self.assertTrue(wheels and all(w > 0 for w in wheels))
+        self.e.stop_scroll()
+        self.assertIsNone(self.e.scroll_anchor)
+
     def test_scroll_mode(self):
         self.e.set_paused(False)
         self.e.perform("scroll", (960, 540))

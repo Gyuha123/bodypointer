@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from bodypointer.gestures import GestureDetector  # noqa: E402
+from bodypointer.gestures import GestureDetector, personal_threshold  # noqa: E402
 from bodypointer.hangul import HangulComposer, choseong  # noqa: E402
 from bodypointer.insights import auto_quick_actions, recommend  # noqa: E402
 from bodypointer.parts import get_part  # noqa: E402
