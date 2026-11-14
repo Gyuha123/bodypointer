@@ -262,6 +262,9 @@ class App(QObject):
             b.set_sticky("control", None)
             self.say("카메라 커서 제어를 켰습니다")
         elif kind in self.MESSAGES:
+            if kind in ("scroll_start", "scroll_end"):
+                b.set_sticky("scroll_pick", None)
+                self._sync_scroll_button()
             text, level, voice = self.MESSAGES[kind]
             b.flash(text, level)
             if voice:
