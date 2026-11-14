@@ -63,7 +63,8 @@ class App(QObject):
         self.wizard = None
         self.calib_dialog = None
         self._last_voice = {}
-        self._hover = (None, 0.0, 0.0)
+        self._gcal = None              # '내 표정으로 맞추기' 진행 상태
+        self._gcal_result = {}
         self._status_t = 0.0
         self._last_break = time.monotonic()
         self._sessions_cache = None
@@ -88,7 +89,8 @@ class App(QObject):
         self.predictor = Predictor()
         self._load_words()
         self.stabilizer = PointStabilizer()
-        self.gesture_detector = GestureDetector(self.settings.gesture_sensitivity)
+        self.gesture_detector = GestureDetector(self.settings.gesture_sensitivity,
+                                                personal=self.settings.gesture_thresholds)
 
         # 화면 요소
         self.ring, self.banner = CursorRing(), Banner()
@@ -98,8 +100,8 @@ class App(QObject):
         tb = self.toolbar
         tb.pauseClicked.connect(self.toggle_pause)
         tb.clickModeClicked.connect(self._cycle_click_mode)
-        tb.scrollUp.connect(lambda: self.engine.scroll_last_target(3))
-        tb.scrollDown.connect(lambda: self.engine.scroll_last_target(-3))
+        tb.scrollClicked.connect(self._toolbar_scroll)
+        tb.collapseToggled.connect(lambda v: self.update("toolbar_collapsed", v))
         tb.keyboardClicked.connect(self.toggle_keyboard)
         tb.saveClicked.connect(self.save_session)
         tb.nextPart.connect(self.next_part)
@@ -141,7 +143,7 @@ class App(QObject):
         tb.set_click_mode("menu" if self.settings.dwell_popup else self.settings.click_type)
         tb.set_relative(self.settings.mode == "relative")
         self._refresh_quick_actions()
-        tb.place()
+        tb.set_collapsed(self.settings.toolbar_collapsed)
         tb.show()
         self.window.show()
         self.alert("paused")   # NFR-09: 시작은 항상 일시정지
@@ -209,7 +211,6 @@ class App(QObject):
             self.recorder.on_lost()
 
     MESSAGES = {
-        "found": ("다시 찾았어요", "ok", None),
         "override": ("마우스가 움직여서 잠시 양보할게요", "info", None),
         "drag_start": ("드래그 중 — 놓을 곳에 머무르세요", "info", "드래그를 시작합니다. 놓을 곳에 머무르세요."),
         "drag_end": ("드래그를 놓았어요", "ok", None),
@@ -224,11 +225,10 @@ class App(QObject):
         part = get_part(self.settings.part_id).name
         if kind == "lost":
             b.set_sticky("lost", f"‘{part}’을(를) 놓쳤어요 — 카메라에 보이게 해 주세요")
-            self.say("추적이 끊겼습니다", key="lost", every=5)
+            self.say("추적이 끊겼습니다", key="lost", every=60)
         elif kind == "found":
             b.set_sticky("lost", None)
             b.set_sticky("frame", None)
-            b.flash(*self.MESSAGES["found"][:2], ms=900)
         elif kind == "paused":
             # 화면 위를 계속 가리지 않도록 잠깐만 보여 준다. 상태는 툴바 '재개' 버튼과 점선 원으로 계속 표시된다.
             b.flash("클릭이 멈춰 있어요 — 툴바 ‘재개’에 머무르거나 Pause 키", "info", 4000)
@@ -621,13 +621,13 @@ class App(QObject):
         if hasattr(self, "worker"):
             self._update_sources()
 
-    def _update_sources(self):
+    def _update_sources(self, force_face=False):
         part = get_part(self.settings.part_id)
         if self.picking:
             sources, model = {"face", "pose", "hand"}, "lite"
         else:
             sources, model = {part.source}, ("full" if part.full_model else "lite")
-        if self.settings.gestures or (self.window.isVisible() and self.window.current_page() == "gesture"):
+        if force_face or self._gcal is not None or self.settings.gestures or \n                (self.window.isVisible() and self.window.current_page() == "gesture"):
             sources.add("face")             # 표정 제스처
         self.worker.set_sources(sources, model)
 
@@ -714,9 +714,9 @@ class App(QObject):
         return c.most_common(k)
 
     def quick_actions(self):
-        out = list(self.settings.quick_actions)
+        out = [a for a in self.settings.quick_actions if a not in GESTURE_ONLY]
         if self.settings.auto_quick:
-            out += [a for a in auto_quick_actions(self.all_sessions()) if a not in out]
+            out += [a for a in auto_quick_actions(self.all_sessions()) if a not in out and a not in GESTURE_ONLY]
         return out[:3]
 
     def _refresh_quick_actions(self):
@@ -815,6 +815,8 @@ class App(QObject):
     def _reload_settings(self):
         self.engine.apply_settings(self.settings)
         self.gesture_detector.sensitivity = self.settings.gesture_sensitivity
+        self.gesture_detector.personal = dict(self.settings.gesture_thresholds)
+        self.toolbar.set_collapsed(self.settings.toolbar_collapsed)
         self._apply_theme()
         self._apply_part_config()
         self._update_sources()

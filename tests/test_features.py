@@ -89,21 +89,53 @@ class StabilizeTest(unittest.TestCase):
 
 
 class GestureTest(unittest.TestCase):
-    def test_fires_once_after_hold(self):
+    TAP = {"mouth_open": "tap"}
+
+    def test_tap_fires_once_per_expression(self):
         g = GestureDetector()
-        fired = []
+        ev = []
         for i in range(30):          # 1초 동안 입을 벌리고 있음
-            fired += g.update({"jawOpen": 0.8}, i / 30, {"mouth_open"})
-        self.assertEqual(fired, ["mouth_open"])
+            ev += g.update({"jawOpen": 0.8}, i / 30, self.TAP)
+        self.assertEqual(ev, [("mouth_open", "tap")])
         for i in range(10):
-            g.update({"jawOpen": 0.0}, 1 + i / 30, {"mouth_open"})
+            g.update({"jawOpen": 0.0}, 1 + i / 30, self.TAP)
         for i in range(30):
-            fired += g.update({"jawOpen": 0.8}, 2 + i / 30, {"mouth_open"})
-        self.assertEqual(fired, ["mouth_open", "mouth_open"])
+            ev += g.update({"jawOpen": 0.8}, 2 + i / 30, self.TAP)
+        self.assertEqual(len(ev), 2)
+
+    def test_hold_start_and_end(self):
+        g = GestureDetector()
+        modes = {"smile": "hold"}
+        ev = []
+        for i in range(30):
+            ev += g.update({"mouthSmileLeft": 0.9, "mouthSmileRight": 0.9}, i / 30, modes)
+        self.assertEqual(ev, [("smile", "start")])
+        self.assertEqual(g.holding(), {"smile"})
+        ev += g.update({"mouthSmileLeft": 0.62, "mouthSmileRight": 0.62}, 1.05, modes)   # 살짝 약해져도 유지
+        self.assertEqual(len(ev), 1)
+        for i in range(10):
+            ev += g.update({}, 1.1 + i / 30, modes) if False else g.update({"mouthSmileLeft": 0.0}, 1.1 + i / 30, modes)
+        self.assertEqual(ev[-1], ("smile", "end"))
+
+    def test_face_lost_releases_hold(self):
+        g = GestureDetector()
+        for i in range(20):
+            g.update({"jawOpen": 0.9}, i / 30, {"mouth_open": "hold"})
+        self.assertEqual(g.update(None, 1.0, {"mouth_open": "hold"}), [("mouth_open", "end")])
 
     def test_inactive_gesture_ignored(self):
         g = GestureDetector()
-        self.assertEqual(sum((g.update({"browInnerUp": 1.0}, i / 30, set()) for i in range(30)), []), [])
+        self.assertEqual(sum((g.update({"browInnerUp": 1.0}, i / 30, {}) for i in range(30)), []), [])
+
+    def test_personal_threshold(self):
+        th = personal_threshold([0.05] * 30, [0.5] * 60)
+        self.assertAlmostEqual(th, 0.05 + 0.45 * 0.55, places=3)
+        self.assertIsNone(personal_threshold([0.3] * 30, [0.35] * 60))   # 구분이 안 되는 표정
+        g = GestureDetector(personal={"brow_raise": 0.2})
+        ev = []
+        for i in range(30):
+            ev += g.update({"browInnerUp": 0.3}, i / 30, {"brow_raise": "tap"})   # 기본 기준(0.55)이면 안 됐을 값
+        self.assertEqual(ev, [("brow_raise", "tap")])
 
 
 class UsageAndInsightsTest(unittest.TestCase):
