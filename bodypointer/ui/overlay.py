@@ -25,14 +25,28 @@ def _transparent(w: QWidget):
     w.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
 
+def force_topmost(w: QWidget):
+    """다른 '항상 위' 창(작업 표시줄, 툴바, 키보드, 다른 프로그램)보다 앞으로 다시 올린다. 포커스는 가져가지 않음."""
+    try:
+        import ctypes
+        HWND_TOPMOST, SWP_NOSIZE, SWP_NOMOVE, SWP_NOACTIVATE, SWP_NOOWNERZORDER = -1, 0x1, 0x2, 0x10, 0x200
+        ctypes.windll.user32.SetWindowPos(ctypes.c_void_p(int(w.winId())), ctypes.c_void_p(HWND_TOPMOST), 0, 0, 0, 0,
+                                          SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER)
+    except Exception:
+        w.raise_()
+
+
 class CursorRing(QWidget):
-    SMALL, LARGE = 140, 420
+    SMALL, LARGE = 100, 420
+    R = 18                       # 링 반지름 (px)
 
     def __init__(self):
         super().__init__()
         _transparent(self)
         self.resize(self.SMALL, self.SMALL)
         self.state = {}
+        self._top_timer = QTimer(self, interval=300, timeout=lambda: self.isVisible() and force_topmost(self))
+        self._top_timer.start()
 
     def update_state(self, st: dict):
         """st: center(논리 px), progress, paused, lost, drag, scroll(dead, dy), color_key, clutched"""
@@ -44,6 +58,7 @@ class CursorRing(QWidget):
         self.move(int(cx - size / 2), int(cy - size / 2))
         if not self.isVisible():
             self.show()
+            force_topmost(self)
         self.update()
 
     def paintEvent(self, _):
