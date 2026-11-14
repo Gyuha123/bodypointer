@@ -213,6 +213,17 @@ class Engine:
             self.dwell.reset()
             return
 
+        if self.scroll_pick:
+            # 스크롤할 곳 고르기: 다음에 머무른 곳(어느 창이든)에서 스크롤 모드를 시작한다.
+            # 클릭이 아니라서 일시정지 중에도 동작한다.
+            self.dwell.dwell_time = self.settings.dwell_time
+            fired = self.dwell.update(self.pos, t)
+            if fired:
+                self.scroll_pick = False
+                self.last_target = fired
+                self.start_scroll(fired, manual=False)
+            return
+
         own = self.hooks.ui_target(self.pos)
         if self.paused and not own:
             self.dwell.reset()
