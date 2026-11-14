@@ -145,15 +145,19 @@ class Banner(QWidget):
         self._timer.start(ms)
         self._show()
 
-    def set_sticky(self, key: str, text: str | None, level: str = "warn"):
+    def set_sticky(self, key: str, text: str | None, level: str = "warn", now: bool = False):
+        """now=True: 떠 있는 잠깐 알림을 기다리지 않고 바로 보여 준다 (지금 해야 할 일 안내)."""
         if text:
-            if self.sticky.get(key) == (text, level):
+            if self.sticky.get(key) == (text, level) and not now:
                 return
+            self.sticky.pop(key, None)
             self.sticky[key] = (text, level)
         elif key in self.sticky:
             self.sticky.pop(key)
         else:
             return
+        if now:
+            self._timer.stop()
         if not self._timer.isActive():
             self._expire()
 
