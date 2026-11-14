@@ -487,6 +487,17 @@ class App(QObject):
         self.run_action(aid, "gesture")
 
     # ---------- 제스처 설정 편의 ----------
+    def apply_tremor_preset(self):
+        """떨림이 심한 사용자용 한 번에 맞추기."""
+        s = self.settings
+        s.filter_strength = max(s.filter_strength, 160)
+        s.dwell_radius = max(s.dwell_radius, 80)
+        s.tremor_assist = True
+        self.update("filter_strength", s.filter_strength)      # 엔진·화면·저장 반영
+        self.window.refresh()
+        self.banner.flash("떨림이 심할 때에 맞췄어요 — 떨림 보정 160 · 허용 범위 80px · 떨림 클릭 보조", "ok", 3000)
+        self.say("떨림 설정을 적용했습니다")
+
     def apply_gesture_preset(self):
         self.settings.gestures = dict(PRESET)
         self._update_sources()
