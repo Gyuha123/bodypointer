@@ -286,13 +286,14 @@ class App(QObject):
         sample = vision.extract_sample(res, part) if res.camera_ok else None
         pt = self.stabilizer(sample, t)
         cal = self.calibrator
+        self._choose_source(res.camera_ok and not res.low_light and pt is not None, res, t)
         if cal is not None and cal.active:
             cal.feed(pt, t)
-            if pt is None:
+            if pt is None and self.input_source == "camera":
                 self.engine.on_point(None, t)
-        else:
+        elif self.input_source == "camera":
             self.engine.on_point(pt, t)
-        self.recorder.on_frame(part.id, pt, self.engine.pos, t, self.engine.lost or pt is None, self.engine.w)
+            self.recorder.on_frame(part.id, pt, self.engine.pos, t, self.engine.lost or pt is None, self.engine.w)
 
         # 표정 제스처 (tap: 한 번 실행 / hold: 표정을 유지하는 동안)
         modes = {gid: ("hold" if get_action(aid) and get_action(aid).kind == "hold" else "tap")
