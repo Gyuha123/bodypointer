@@ -655,9 +655,9 @@ class SettingsPage(QWidget):
         bias_btn.setToolTip("커서가 저절로 흘러가면 눌러 주세요. 2초 동안 머리를 가만히 두세요.")
         bias_btn.clicked.connect(app.remote_recalibrate)
         rc.add(row(dir_btn, bias_btn, None))
-        self.toggles["remote_nod_click"] = ToggleRow("고개 끄덕 = 클릭 (실험)", "고개를 빠르게 숙였다 들면 그 자리를 클릭해요. "
-                                                     "어두워서 표정 제스처가 안 될 때 좋아요.", s.remote_nod_click)
-        rc.add(self.toggles["remote_nod_click"])
+        self._nod_toggle = ToggleRow("고개 끄덕 = 클릭 (실험)", "고개를 빠르게 숙였다 들면 그 자리를 클릭해요. "
+                                     "어두워서 표정 제스처가 안 될 때 좋아요.", s.remote_nod_click)
+        rc.add(self._nod_toggle)
         rc.add(label("처음 한 번: Windows 블루투스 설정에서 ‘HeadMouse-IMU’를 페어링하거나 USB로 연결 → ‘방향 맞추기’. "
                      "센서의 스위치를 누르면 센서가 다시 보정돼요(2초 가만히).", "small", wrap=True))
         lay.addWidget(rc)
