@@ -40,6 +40,8 @@ class Settings:
     # 개인화
     gestures: dict = field(default_factory=dict)        # 제스처 id -> 동작 id
     gesture_sensitivity: float = 1.0
+    gesture_thresholds: dict = field(default_factory=dict)   # '내 표정으로 맞추기' 결과
+    toolbar_collapsed: bool = False
     quick_actions: list = field(default_factory=list)   # 직접 고정한 빠른 실행
     auto_quick: bool = True          # 자주 쓴 기능을 툴바에 자동 추가
     dismissed_recs: list = field(default_factory=list)
