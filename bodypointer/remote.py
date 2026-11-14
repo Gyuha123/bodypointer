@@ -31,8 +31,47 @@ CLOCK_DRIFT = 0.002                              # 장치·PC 시계 차이가 �
 RESET_BROWNOUT = 9                               # esp_reset_reason: 저전압
 
 
+DEVICE_NAME = "HeadMouse-IMU"
+
+
+def bt_device_names() -> dict:
+    """Windows에 페어링된 블루투스 장치 이름 {MAC(대문자 12자리): 이름}. 실패하면 빈 dict."""
+    names = {}
+    try:
+        import winreg
+        root = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                              r"SYSTEM\CurrentControlSet\Services\BTHPORT\Parameters\Devices")
+    except (ImportError, OSError):
+        return names
+    i = 0
+    while True:
+        try:
+            mac = winreg.EnumKey(root, i)
+        except OSError:
+            break
+        i += 1
+        try:
+            with winreg.OpenKey(root, mac) as k:
+                raw = winreg.QueryValueEx(k, "Name")[0]
+            name = raw.decode("utf-8", "ignore") if isinstance(raw, bytes) else str(raw)
+            names[mac.upper()] = name.rstrip("\x00").strip()
+        except OSError:
+            continue
+    return names
+
+
+def pick_bt_ports(ports: list[tuple[str, str]], names: dict) -> list[str]:
+    """[(포트, MAC)] 중 머리 센서 포트만 고른다.
+    이름을 알 수 있으면 'HeadMouse' 장치만 (이어폰·휴대폰 등 다른 블루투스 기기에 연결을 시도하지 않음).
+    이름을 하나도 알 수 없을 때만 모든 포트를 시도한다."""
+    known = {mac: names[mac] for _, mac in ports if mac in names}
+    if not known:
+        return [dev for dev, _ in ports]
+    return [dev for dev, mac in ports if names.get(mac, "").lower().startswith("headmouse")]
+
+
 def find_ports():
-    """(블루투스 나가는 포트들, USB 포트들)."""
+    """(블루투스 나가는 포트들 중 머리 센서, USB 포트들)."""
     try:
         import serial.tools.list_ports as lp
     except ImportError:
@@ -42,11 +81,11 @@ def find_ports():
         hwid = (p.hwid or "").upper()
         if "BTHENUM" in hwid:
             m = re.search(r"&([0-9A-F]{12})_", hwid)
-            if m and m.group(1) != "0" * 12:
-                bt.append(p.device)
+            if m and m.group(1) != "0" * 12:          # 0000…은 PC가 받는 쪽(들어오는) 포트라 제외
+                bt.append((p.device, m.group(1)))
         elif p.vid in ESP_VIDS:
             usb.append(p.device)
-    return bt, usb
+    return pick_bt_ports(bt, bt_device_names()), usb
 
 
 class RemoteWorker(QThread):
