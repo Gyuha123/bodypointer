@@ -334,8 +334,16 @@ class Engine:
             return
         self.perform(self.settings.click_type, pt)
 
+    DOUBLE_GUARD = 0.6        # 이 시간 안의 두 번째 단일 클릭은 버린다 (Windows가 더블클릭으로 오인하지 않게)
+
     def perform(self, action: str, pt):
         """클릭 종류를 pt 위치에서 실행 (FR-31)."""
+        if action == "left":
+            # 머무르기·표정·고개 끄덕 등 여러 경로의 클릭이 거의 동시에 겹치면 하나만 보낸다
+            now = time.monotonic()
+            if now - self._last_left_click < self.DOUBLE_GUARD:
+                return
+            self._last_left_click = now
         self.last_target = pt
         winmouse.move(*pt)
         self._last_set = (int(round(pt[0])), int(round(pt[1])))
