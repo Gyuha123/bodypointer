@@ -348,7 +348,8 @@ class App(QObject):
         else:
             e.scroll_pick = True
             e.dwell.reset()
-            self.banner.set_sticky("scroll_pick", "스크롤할 곳에 잠시 머무르세요 — 취소: 툴바 ‘스크롤’ 다시 누르기", "info")
+            self.banner.set_sticky("scroll_pick", "스크롤할 곳에 잠시 머무르세요 — 취소: 툴바 ‘스크롤’ 다시 누르기", "info",
+                                   now=True)
             self.say("스크롤할 곳에 머무르세요")
         self._sync_scroll_button()
 
