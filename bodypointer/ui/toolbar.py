@@ -5,7 +5,7 @@ Dwell이 이 창 위에서 발동하면 OS 클릭 대신 버튼의 click()을 �
 """
 from PySide6.QtCore import QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import (QApplication, QFrame, QGraphicsDropShadowEffect, QGridLayout, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import QApplication, QFrame, QGraphicsDropShadowEffect, QGridLayout, QVBoxLayout, QWidget
 
 from ..actions import get_action
 from . import theme
@@ -137,7 +137,7 @@ class Toolbar(FloatingPanel):
 
     def set_relative(self, relative: bool):
         self.clutch_btn.setVisible(relative)
-        self.adjustSize()
+        self.place()
 
     def set_keyboard_open(self, is_open: bool):
         self.kb_btn.setChecked(is_open)
@@ -157,7 +157,7 @@ class Toolbar(FloatingPanel):
             self.quick_box.addWidget(b)
             self.quick_buttons.append(b)
         self.quick_title.setVisible(bool(self.quick_buttons))
-        self.adjustSize()
+        self.place()
 
 
 class ClickPopup(FloatingPanel):
