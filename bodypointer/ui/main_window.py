@@ -298,7 +298,7 @@ class ClickPage(QWidget):
         self.rows = {
             "dwell_time": SliderRow("머무는 시간", "실수로 자꾸 눌리면 늘리고, 답답하면 줄여요.", 0.5, 3.0, 0.1, s.dwell_time, "{:.1f}초"),
             "dwell_radius": SliderRow("허용 범위", "손이 떨려 게이지가 자꾸 끊기면 넓혀요.", 15, 90, 5, s.dwell_radius, "{:.0f}px"),
-            "kb_dwell_time": SliderRow("키보드 머무는 시간", "키보드 키는 더 빨리 눌리게 할 수 있어요.", 0.4, 2.0, 0.1, s.kb_dwell_time, "{:.1f}초"),
+            "kb_dwell_time": SliderRow("키보드 머무는 시간", "키가 너무 빨리 눌리면 늘리고, 익숙해지면 조금씩 줄여요.", 0.6, 3.0, 0.1, s.kb_dwell_time, "{:.1f}초"),
         }
         for key, r in self.rows.items():
             r.valueChanged.connect(lambda v, k=key: app.update(k, v))

@@ -14,8 +14,12 @@ PROFILE_DIR = APP_DIR / "profiles"
 APP_STATE = APP_DIR / "app.json"
 
 
+SETTINGS_VERSION = 2
+
+
 @dataclass
 class Settings:
+    version: int = 2                 # 설정 형식 버전 (예전 값을 한 번 고칠 때 사용)
     part_id: str = "nose"
     favorites: list = field(default_factory=lambda: ["nose", "r_index", "r_shoulder"])
     mode: str = "absolute"           # absolute | relative

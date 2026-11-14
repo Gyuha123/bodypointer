@@ -140,7 +140,7 @@ def recommend(sessions: list[dict], settings) -> list[Rec]:
                         {"type": "set", "key": "break_reminder", "value": True}, "알림 켜기"))
 
     # 8. 글을 많이 쓰면 키보드 머무는 시간 줄이기
-    if agg["typed"] > 300 and settings.kb_dwell_time > 0.6:
+    if agg["typed"] > 300 and settings.kb_dwell_time > 0.9:
         v = round(settings.kb_dwell_time - 0.1, 1)
         recs.append(Rec("kb_fast", "keyboard", f"키보드로 {agg['typed']}글자를 입력하셨어요",
                         f"키보드의 머무는 시간을 {settings.kb_dwell_time:.1f}초 → {v:.1f}초로 줄여 더 빨리 쳐 보세요.",
