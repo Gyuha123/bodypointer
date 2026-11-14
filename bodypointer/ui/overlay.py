@@ -113,7 +113,8 @@ class CursorRing(QWidget):
             p.setPen(QPen(col, 5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
             p.drawArc(rect, 90 * 16, -int(360 * 16 * prog))
 
-        text = "드래그 중" if st.get("drag") else "커서 고정" if st.get("clutched") else ""
+        text = ("드래그 중" if st.get("drag") else "스크롤할 곳" if st.get("pick")
+                else "커서 고정" if st.get("clutched") else "")
         if text:
             f = theme.ui_font(13, QFont.Weight.Bold)
             p.setFont(f)

@@ -370,8 +370,12 @@ class App(QObject):
             "lost": e.lost,
             "drag": e.drag_active,
             "clutched": e.mapper.clutched,
-            "color_key": "keyboard" if on_kb else "menu" if self.settings.dwell_popup else self.settings.click_type,
+            "pick": e.scroll_pick,
+            "color_key": "scroll" if e.scroll_pick else "keyboard" if on_kb
+            else "menu" if self.settings.dwell_popup else self.settings.click_type,
         }
+        if e.scroll_pick:
+            st["paused"] = False               # 스크롤할 곳 고르기는 일시정지 중에도 게이지를 보여 준다
         if e.scroll_anchor is not None:
             st["scroll"] = (max(self.settings.dwell_radius, 30) / self.dpr, (e.pos[1] - e.scroll_anchor[1]) / self.dpr)
         self.ring.update_state(st)
