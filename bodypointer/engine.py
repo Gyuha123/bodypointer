@@ -107,6 +107,7 @@ class Engine:
         self._drag_manual = False
         self.scroll_anchor = None
         self._scroll_manual = False
+        self.scroll_pick = False
         if self.hooks.popup_visible():
             self.hooks.hide_popup()
 
