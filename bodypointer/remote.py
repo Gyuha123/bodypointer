@@ -6,7 +6,12 @@
 통신 형식 (리틀 엔디언): [A5 5B][type][len][payload][checksum = (type + len + payload) & 0xFF]
   type 1 (28B): uint32 t_us, float gx gy gz (deg/s, 바이어스 제거), float ax ay az (g)
   type 2 (2B) : uint8 WHO_AM_I, uint8 상태 (0 보정 중 / 1 동작 / 2 센서 오류)
+  type 3 (20B, 1초마다 진단): uint32 ×4, uint32 플래그
+        플래그 bit0 블루투스 연결, bit8~15 직전 리셋 원인(9 = 저전압), bit16~31 전원을 켠 뒤 저전압 리셋 횟수
 PC → 장치: 'c' 자이로 다시 보정, 'b' 바이너리 모드
+
+펌웨어는 배터리 절약을 위해 IMU 패킷을 8개(40ms)씩 묶어 보낸다.
+그대로 쓰면 커서가 40ms마다 툭툭 움직이므로, 장치 시각 기준으로 고르게 풀어 주는 재생 버퍼를 둔다 (지연 약 50ms).
 """
 import re
 import struct
