@@ -637,6 +637,31 @@ class SettingsPage(QWidget):
         cam.add(self.cam)
         lay.addWidget(cam)
 
+        rc = Card("머리 센서 (리모컨)", "이마에 붙이는 자이로 센서예요. 불을 꺼서 어둡거나, 얼굴이 가려지거나, 누워서 쓰거나, "
+                                   "카메라를 끄고 싶을 때 머리를 돌린 만큼 커서를 움직여요. 자이로라 어두워도 정확해요.")
+        self.remote_status = label("", "h2", wrap=True)
+        rc.add(self.remote_status)
+        self.remote_mode = Segmented([("auto", "sync", "카메라 약할 때 자동"), ("always", "person", "항상 머리 센서"),
+                                      ("off", "close", "사용 안 함")])
+        self.remote_mode.changed.connect(lambda k: app.update("remote_mode", k))
+        rc.add(self.remote_mode)
+        self.remote_speed = SliderRow("속도", "머리를 조금만 돌려도 멀리 가게 하려면 올려요.", 0.4, 3.0, 0.1, s.remote_speed, "{:.1f}")
+        self.remote_speed.valueChanged.connect(lambda v: app.update("remote_speed", v))
+        rc.add(self.remote_speed)
+        dir_btn = IconButton("sync", "방향 맞추기", "primary")
+        dir_btn.setToolTip("정면 → 오른쪽으로 돌리기 → 고개 숙이기 (약 6초)")
+        dir_btn.clicked.connect(app.start_remote_direction)
+        bias_btn = IconButton("refresh", "센서 다시 보정")
+        bias_btn.setToolTip("커서가 저절로 흘러가면 눌러 주세요. 2초 동안 머리를 가만히 두세요.")
+        bias_btn.clicked.connect(app.remote_recalibrate)
+        rc.add(row(dir_btn, bias_btn, None))
+        self.toggles["remote_nod_click"] = ToggleRow("고개 끄덕 = 클릭 (실험)", "고개를 빠르게 숙였다 들면 그 자리를 클릭해요. "
+                                                     "어두워서 표정 제스처가 안 될 때 좋아요.", s.remote_nod_click)
+        rc.add(self.toggles["remote_nod_click"])
+        rc.add(label("처음 한 번: Windows 블루투스 설정에서 ‘HeadMouse-IMU’를 페어링하거나 USB로 연결 → ‘방향 맞추기’. "
+                     "센서의 스위치를 누르면 센서가 다시 보정돼요(2초 가만히).", "small", wrap=True))
+        lay.addWidget(rc)
+
         view = Card("화면과 소리")
         self.toggles = {
             "high_contrast": ToggleRow("고대비", "검정 바탕에 노란 강조색으로 더 또렷하게 보여요.", s.high_contrast),

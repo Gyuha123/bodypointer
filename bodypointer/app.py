@@ -3,7 +3,7 @@ import atexit
 import os
 import time
 import webbrowser
-from collections import Counter
+from collections import Counter, deque
 from pathlib import Path
 
 from PySide6.QtCore import QLocale, QObject, QPoint, Qt, QTimer, Signal
@@ -16,6 +16,7 @@ from .gestures import GESTURES, PRESET, GestureDetector, personal_threshold
 from .insights import auto_quick_actions, recommend
 from .parts import get_part
 from .predict import Predictor
+from .remote import NodDetector, RemoteWorker, fit_axes
 from .stabilize import PointStabilizer
 from .ui import theme
 from .ui.calibration import CalibrationWidget
@@ -67,6 +68,13 @@ class App(QObject):
         self.calib_dialog = None
         self._last_voice = {}
         self._gcal = None              # '내 표정으로 맞추기' 진행 상태
+        self.input_source = "camera"  # 지금 커서를 움직이는 입력: camera / remote(머리 센서)
+        self._cam_bad_since = self._cam_good_since = None
+        self._remote_reason = ""
+        self._remote_announced = False
+        self._rcal = None              # 머리 센서 방향 맞추기 진행 상태
+        self._pos_hist = deque(maxlen=120)
+        self.nod = NodDetector()
         self._gcal_result = {}
         self._status_t = 0.0
         self._last_break = time.monotonic()
@@ -143,6 +151,11 @@ class App(QObject):
         atexit.register(self._safety_release)
 
         self.worker.start()
+        self.remote = RemoteWorker()
+        self.remote.motion.connect(self._on_remote_motion)
+        self.remote.status.connect(self._on_remote_status)
+        if self.settings.remote_mode != "off":
+            self.remote.start()
         tb.set_click_mode("menu" if self.settings.dwell_popup else self.settings.click_type)
         tb.set_relative(self.settings.mode == "relative")
         self._refresh_quick_actions()
@@ -735,6 +748,8 @@ class App(QObject):
             self.toolbar.place()
         if key in ("dwell_popup", "click_type"):
             self.toolbar.set_click_mode("menu" if self.settings.dwell_popup else self.settings.click_type)
+        if key == "remote_mode":
+            self._ensure_remote()
         if key in ("quick_actions", "auto_quick"):
             self._refresh_quick_actions()
         if key not in SLIDER_KEYS:
@@ -1083,6 +1098,7 @@ class App(QObject):
         try:
             self._save()
             self.engine._end_modes()          # 누르고 있던 마우스 버튼 놓기
+            self.remote._stop = True
             self.hotkeys.stop()
         finally:
             hard_exit()
