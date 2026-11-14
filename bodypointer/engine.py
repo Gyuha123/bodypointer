@@ -165,6 +165,9 @@ class Engine:
             self.mapper.reset(cursor=self.pos)
             self.hooks.alert("found")
         self.last_seen = t
+        if t - (self._lost_since or t) < 0:
+            pass
+        self.last_seen = t
 
         if not self.control_enabled:
             return
