@@ -37,6 +37,9 @@ class Engine:
         self.scroll_anchor = None
         self._scroll_manual = False           # 제스처로 시작한 스크롤 (가운데 머물러도 안 끝남)
         self.scroll_pick = False              # 툴바 '스크롤': 스크롤할 곳을 고르는 중
+        self._locked = False                  # 떨림 클릭 보조로 커서를 붙잡고 있는지
+        self._speed = 0.0                     # 포인터 평균 속도 (px/s)
+        self._prev_pos, self._prev_t = None, 0.0
         self._scroll_still_since = None
         self.last_target = None               # 마지막으로 클릭한 지점
         self._last_set = None

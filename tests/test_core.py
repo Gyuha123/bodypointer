@@ -92,14 +92,14 @@ class FilterTest(unittest.TestCase):
         self.assertLessEqual(max(xs) - min(xs), 8.0)
         self.assertLessEqual(max(ys) - min(ys), 8.0)
 
-    def test_rubber_band_is_smooth(self):
-        """반경을 넘으면 넘은 만큼만 따라간다 (뚝 점프하지 않음)."""
-        f = PointFilter(strength=0)
-        f.deadband = 10
-        f(0, 0, 0)
-        steps = [f(x, 0, i * 0.033)[0] for i, x in enumerate(range(0, 200, 4), start=1)]
-        jumps = [b - a for a, b in zip(steps, steps[1:])]
-        self.assertLess(max(jumps), 12)
+    def test_slow_motion_has_no_stutter(self):
+        """천천히 움직일 때(초당 60px) 멈췄다-튀었다 하지 않는다: 매 프레임 조금씩 계속 움직인다."""
+        for strength in (60, 160, 200):
+            f = PointFilter(strength=strength)
+            xs = [f(i * 2.0, 0, i / 30)[0] for i in range(150)]      # 30fps, 프레임당 2px
+            steps = [b - a for a, b in zip(xs[60:], xs[61:])]
+            self.assertGreater(min(steps), 0.3, strength)               # 멈춘 프레임 없음
+            self.assertLess(max(steps), 6.0, strength)                  # 확 튀는 프레임 없음
 
     def test_follows_fast_motion(self):
         f = PointFilter(strength=60)
@@ -284,6 +284,22 @@ class EngineTest(unittest.TestCase):
                 clicks.append(self.mouse.pos)
         self.assertGreaterEqual(len(clicks), 1)
         self.assertLess(math.dist(clicks[0], (960, 540)), 40)
+
+    def test_slow_move_not_frozen_by_click_assist(self):
+        """떨림 클릭 보조가 켜져 있어도, 천천히 이동하는 중에는 커서를 붙잡지 않는다 (끊김 방지)."""
+        self.e.settings.tremor_assist = True
+        self.e.settings.dwell_radius = 80
+        self.e.apply_settings(self.e.settings)
+        self.e.set_paused(False)
+        self.run_still(0.3)
+        xs = []
+        for i in range(120):                       # 4초 동안 오른쪽으로 천천히 (초당 약 60px)
+            self.t += 1 / 30
+            self.e.on_point((0.5 + i * 0.0004, 0.5), self.t)
+            xs.append(self.mouse.pos[0])
+        frozen = max(len(list(g)) for _, g in __import__("itertools").groupby(xs))
+        self.assertLessEqual(frozen, 3)            # 같은 자리에 멈춰 있는 프레임이 길게 이어지지 않음
+        self.assertLess(max(b - a for a, b in zip(xs, xs[1:])), 15)   # 확 튀지 않음
 
     def test_scroll_pick_targets_where_user_dwells(self):
         """툴바 '스크롤' → 다음에 머무른 곳에서 스크롤 시작 (일시정지 중·BodyPointer 창 위에서도)."""
