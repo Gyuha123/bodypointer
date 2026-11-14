@@ -67,6 +67,48 @@ ACTIONS: dict[str, Action] = {a.id: a for a in [
 ]}
 
 GROUP_ORDER = ["마우스", "편집", "탐색", "앱"]
+
+# ---------------- 링크 열기 ----------------
+# 동작 id 형식: "link:이름\t주소"  (예: "link:유튜브\thttps://www.youtube.com")
+LINK_PREFIX = "link:"
+LINK_PRESETS = [("네이버", "https://www.naver.com"), ("유튜브", "https://www.youtube.com"),
+                ("구글", "https://www.google.com"), ("다음", "https://www.daum.net"),
+                ("네이버 지도", "https://map.naver.com"), ("날씨", "https://weather.naver.com")]
+
+
+def normalize_url(text: str) -> str | None:
+    """사용자가 입력한 주소를 열 수 있는 https/http 주소로. 다른 형식(file:, 프로그램 경로 등)은 거부."""
+    import re
+    from urllib.parse import urlsplit
+    t = (text or "").strip()
+    if not t or any(c.isspace() for c in t):
+        return None
+    if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", t):
+        if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", t) and not re.match(r"^[^:/]+:\d+", t):
+            return None                     # mailto:, javascript:, C:\ 같은 형식
+        t = "https://" + t
+    parts = urlsplit(t)
+    if parts.scheme.lower() not in ("http", "https") or not parts.hostname or "." not in parts.hostname:
+        return None
+    return t
+
+
+def make_link_action(name: str, url: str) -> str:
+    name = (name or "").replace("\t", " ").strip()
+    return f"{LINK_PREFIX}{name}\t{url}"
+
+
+def link_parts(action_id: str) -> tuple[str, str] | None:
+    if not action_id.startswith(LINK_PREFIX):
+        return None
+    name, _, url = action_id[len(LINK_PREFIX):].partition("\t")
+    url = normalize_url(url)
+    if not url:
+        return None
+    if not name:
+        from urllib.parse import urlsplit
+        name = urlsplit(url).hostname.removeprefix("www.")
+    return name, url
 # 키보드 바 편집 패널에 놓을 동작
 EDIT_KEYS = ["copy", "paste", "cut", "undo", "select_all", "delete", "left", "right", "up", "down", "tab", "esc"]
 # 일시정지 중에도 실행되는 동작
