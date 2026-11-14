@@ -402,23 +402,43 @@ class GesturePage(QWidget):
         lay.addWidget(quick)
         lay.addStretch()
 
-    @staticmethod
-    def _action_combo():
-        """동작 고르기: 마우스 / 편집 / 탐색 / 앱 묶음으로 보여 준다."""
-        cb = QComboBox()
-        cb.setMinimumWidth(280)
+    NEW_LINK = "__new_link__"
+
+    def _fill_combo(self, cb):
+        """동작 고르기: 마우스 / 편집 / 탐색 / 앱 / 링크 묶음으로 보여 준다."""
+        cb.blockSignals(True)
+        cb.clear()
         cb.addItem("사용 안 함", "")
-        for group in GROUP_ORDER:
-            cb.addItem(f"── {group} ──", None)
+
+        def header(text):
+            cb.addItem(f"── {text} ──", None)
             cb.model().item(cb.count() - 1).setEnabled(False)
+
+        for group in GROUP_ORDER:
+            header(group)
             for a in ACTIONS.values():
                 if a.group == group:
                     cb.addItem(a.label, a.id)
-        return cb
+        header("링크")
+        for aid in self.app.settings.saved_links:
+            a = get_action(aid)
+            if a:
+                cb.addItem(a.label, aid)
+        cb.addItem("＋ 새 링크 추가…", self.NEW_LINK)
+        cb.blockSignals(False)
+
+    def _chosen(self, gid, data):
+        if data is None:
+            self.refresh()
+        elif data == self.NEW_LINK:
+            self.app.add_link_for_gesture(gid)
+        else:
+            self.app.bind_gesture(gid, data)
 
     def refresh(self):
         s = self.app.settings
         for gid, cb in self.combos.items():
+            self._fill_combo(cb)
             aid = s.gestures.get(gid, "")
             idx = cb.findData(aid)
             if idx < 0 and aid:
