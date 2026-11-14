@@ -321,7 +321,8 @@ class ClickPage(QWidget):
         self.edge = ToggleRow("화면 위·아래 끝에서 스크롤", "커서를 화면 맨 위나 맨 아래에 두면 그쪽으로 스크롤돼요.", s.edge_scroll)
         self.edge.toggled.connect(lambda v: app.update("edge_scroll", v))
         scroll.add(self.edge)
-        scroll.add(label("툴바의 ‘위로·아래로’ 버튼에 머무르면 마지막으로 클릭한 창이 스크롤돼요.", "muted", wrap=True))
+        scroll.add(label("툴바의 ‘스크롤’을 누르면 마지막으로 클릭한 곳에서 위·아래로 움직인 만큼 스크롤돼요. "
+                         "가운데에 머무르면 끝나요. 표정 제스처로도 스크롤할 수 있어요(제스처 메뉴).", "muted", wrap=True))
         lay.addWidget(scroll)
         lay.addStretch()
 
