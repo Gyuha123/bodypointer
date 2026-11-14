@@ -289,14 +289,18 @@ class App(QObject):
                 self.engine.on_point(None, t)
         else:
             self.engine.on_point(pt, t)
-            self._hover_scroll(t)
         self.recorder.on_frame(part.id, pt, self.engine.pos, t, self.engine.lost or pt is None, self.engine.w)
 
-        # 표정 제스처
-        active = set(self.settings.gestures)
-        if res.blend is not None or active:
-            for gid in self.gesture_detector.update(res.blend, t, active):
-                self._gesture_fired(gid)
+        # 표정 제스처 (tap: 한 번 실행 / hold: 표정을 유지하는 동안)
+        modes = {gid: ("hold" if get_action(aid) and get_action(aid).kind == "hold" else "tap")
+                 for gid, aid in self.settings.gestures.items()}
+        if self._gcal is not None:
+            modes = {}                         # 표정 맞추는 중에는 실행하지 않는다
+        if res.blend is not None or modes or self.gesture_detector.holding():
+            for gid, ev in self.gesture_detector.update(res.blend, t, modes):
+                self._gesture_event(gid, ev)
+        if self._gcal is not None and res.blend is not None:
+            self._gcal["scores"].append(self.gesture_detector.scores.get(self._gcal["gid"], 0.0))
 
         # 하체가 화면에 덜 보이면 배치 안내
         lc = self.stabilizer.low_conf_since
