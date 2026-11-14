@@ -868,15 +868,27 @@ class App(QObject):
 
     def quit(self, ask=True):
         if ask and self.recorder.has_data():
-            r = QMessageBox.question(self.window, "종료", "이번에 사용한 기록을 저장할까요?\n저장하면 맞춤 추천과 자동완성에 쓰여요.",
-                                     QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard
-                                     | QMessageBox.StandardButton.Cancel)
+            box = QMessageBox(QMessageBox.Icon.Question, "종료",
+                              "이번에 사용한 기록을 저장할까요?\n저장하면 맞춤 추천과 자동완성에 쓰여요.",
+                              QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard
+                              | QMessageBox.StandardButton.Cancel)
+            box.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)     # 툴바 등 다른 창 뒤에 숨지 않게
+            box.button(QMessageBox.StandardButton.Save).setText("저장하고 종료")
+            box.button(QMessageBox.StandardButton.Discard).setText("저장 안 하고 종료")
+            box.button(QMessageBox.StandardButton.Cancel).setText("취소")
+            r = box.exec()
             if r == QMessageBox.StandardButton.Cancel:
                 return
             if r == QMessageBox.StandardButton.Save:
                 self.save_session()
-        self._save()
-        self.engine._end_modes()
-        self.hotkeys.stop()
-        self.worker.stop()
-        self.qapp.quit()
+        # 화면에서 먼저 모두 치운다 (정리가 느려도 사용자는 바로 꺼진 것으로 보이게)
+        for w in QApplication.topLevelWidgets():
+            w.hide()
+        QApplication.processEvents()
+        try:
+            self._save()
+            self.engine._end_modes()          # 누르고 있던 마우스 버튼 놓기
+            self.hotkeys.stop()
+        finally:
+            # 내장 웹 엔진이 종료 중 멈추는 경우가 있어, 저장을 마친 뒤 프로세스를 확실히 끝낸다
+            os._exit(0)
