@@ -627,7 +627,8 @@ class App(QObject):
             sources, model = {"face", "pose", "hand"}, "lite"
         else:
             sources, model = {part.source}, ("full" if part.full_model else "lite")
-        if force_face or self._gcal is not None or self.settings.gestures or \n                (self.window.isVisible() and self.window.current_page() == "gesture"):
+        on_gesture_page = self.window.isVisible() and self.window.current_page() == "gesture"
+        if force_face or self._gcal is not None or self.settings.gestures or on_gesture_page:
             sources.add("face")             # 표정 제스처
         self.worker.set_sources(sources, model)
 
