@@ -1,0 +1,4 @@
+# MediaPipe는 파이썬 패키지가 아니라 bodypointer/web/vendor 의 웹(WASM) 버전을 Qt WebEngine에서 실행한다.
+opencv-contrib-python>=4.9   # 사용자 지정 영역 CSRT 추적
+PySide6>=6.6                 # UI + QtWebEngine + QtTextToSpeech
+numpy>=1.26

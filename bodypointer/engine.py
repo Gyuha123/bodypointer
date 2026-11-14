@@ -1,0 +1,249 @@
+"""입력 엔진: 추적 좌표 → 커서 이동 → Dwell → 클릭/메뉴/드래그/스크롤.
+
+UI와는 hooks 객체로만 연결한다 (모듈 분리, §5):
+  hooks.ui_target(pt) -> str | None   pt가 BodyPointer 자체 UI 위면 그 이름
+  hooks.ui_dwell(pt)                  자체 UI 위에서 Dwell 발동
+  hooks.popup_visible() -> bool
+  hooks.show_popup(pt) / hooks.hide_popup()
+  hooks.alert(kind: str)              lost / found / paused / resumed / override / drag_start ...
+"""
+import math
+
+from . import winmouse
+from .dwell import DwellDetector
+from .mapping import Calibration, PointerMapper
+from .profile import Settings
+
+LOST_AFTER = 0.3          # 이 시간 이상 부위가 안 보이면 '추적 끊김'
+OVERRIDE_HOLD = 2.0       # 실제 마우스가 움직이면 이 시간 동안 양보
+CLUTCH_AUTO_RELEASE = 3.0
+
+
+class Engine:
+    def __init__(self, settings: Settings, hooks):
+        self.hooks = hooks
+        self.w, self.h = winmouse.screen_size()
+        self.mapper = PointerMapper(self.w, self.h)
+        self.dwell = DwellDetector()
+        self.settings = settings
+
+        self.control_enabled = True
+        self.paused = True                    # NFR-09: 시작 시 클릭 일시정지
+        self.lost = True
+        self.last_seen = None
+        self.pos = (self.w / 2, self.h / 2)   # 엔진이 계산한 포인터 위치
+        self.drag_active = False
+        self.scroll_anchor = None
+        self._scroll_still_since = None
+        self.last_target = None               # 마지막으로 클릭한 지점 (가상 스크롤 버튼 대상)
+        self._last_set = None
+        self.override_until = 0.0
+        self.clutch_until = 0.0
+        self._edge_since = None
+        self._last_wheel = 0.0
+        self.apply_settings(settings)
+
+    def _emit(self, name, *args):
+        """사용 기록용 이벤트 (hooks.on_engine_event가 있으면 전달)."""
+        fn = getattr(self.hooks, "on_engine_event", None)
+        if fn:
+            fn(name, *args)
+
+    # ---------------- 설정 ----------------
+    def apply_settings(self, s: Settings):
+        self.settings = s
+        m = self.mapper
+        m.mode = s.mode
+        m.sensitivity = s.sensitivity
+        m.gain = s.rel_gain
+        m.accel = s.accel
+        m.filter.set_strength(s.filter_strength)
+        m.calib = Calibration.from_list(s.calibrations.get(s.part_id))
+        self.dwell.dwell_time = s.dwell_time
+        self.dwell.radius = s.dwell_radius
+        m.reset(cursor=self.pos)
+
+    def set_calibration(self, calib: Calibration):
+        self.mapper.calib = calib
+        self.settings.calibrations[self.settings.part_id] = calib.to_list()
+        self.mapper.reset(cursor=self.pos)
+
+    # ---------------- 상태 전환 ----------------
+    def set_paused(self, paused: bool):
+        if paused == self.paused:
+            return
+        self.paused = paused
+        if paused:
+            self._end_modes()
+        self.dwell.reset()
+        self.hooks.alert("paused" if paused else "resumed")
+
+    def toggle_pause(self):
+        self.set_paused(not self.paused)
+
+    def set_control(self, enabled: bool):
+        self.control_enabled = enabled
+        if not enabled:
+            self._end_modes()
+        self.dwell.reset()
+        self.mapper.reset(cursor=winmouse.get_pos())
+        self.hooks.alert("control_on" if enabled else "control_off")
+
+    def toggle_clutch(self, t: float, timed: bool = False):
+        m = self.mapper
+        m.clutched = not m.clutched
+        self.clutch_until = t + CLUTCH_AUTO_RELEASE if (m.clutched and timed) else 0.0
+        if not m.clutched:
+            m.reset()
+        self.hooks.alert("clutch_on" if m.clutched else "clutch_off")
+
+    def _end_modes(self):
+        if self.drag_active:
+            winmouse.left_up()
+            self.drag_active = False
+        self.scroll_anchor = None
+        if self.hooks.popup_visible():
+            self.hooks.hide_popup()
+
+    # ---------------- 프레임 처리 ----------------
+    def on_point(self, pt, t: float):
+        """pt: 선택 부위의 정규화 좌표 (x, y) 또는 None(미검출)."""
+        if pt is None:
+            if not self.lost and (self.last_seen is None or t - self.last_seen > LOST_AFTER):
+                self.lost = True
+                self.dwell.reset()            # FR-04: 커서는 현재 위치에 고정
+                self.hooks.alert("lost")
+                self._emit("lost")
+            return
+        if self.lost:
+            self.lost = False
+            self.mapper.reset(cursor=self.pos)
+            self.hooks.alert("found")
+        self.last_seen = t
+
+        if not self.control_enabled:
+            return
+
+        # 보호자/사용자가 실제 마우스를 움직이면 잠시 양보
+        cur = winmouse.get_pos()
+        if self._last_set and self.scroll_anchor is None and math.dist(cur, self._last_set) > 40:
+            if t >= self.override_until:
+                self.hooks.alert("override")
+            self.override_until = t + OVERRIDE_HOLD
+        if t < self.override_until:
+            self._last_set = cur
+            self.pos = cur
+            self.mapper.reset(cursor=cur)
+            self.dwell.reset()
+            return
+
+        if self.clutch_until and t >= self.clutch_until:
+            self.toggle_clutch(t)
+
+        self.pos = self.mapper.update(pt[0], pt[1], t)
+
+        if self.scroll_anchor is not None:
+            self._scroll_step(t)
+            return
+
+        winmouse.move(*self.pos)
+        self._last_set = (int(round(self.pos[0])), int(round(self.pos[1])))
+
+        if self._edge_scroll(t):
+            self.dwell.reset()
+            return
+
+        own = self.hooks.ui_target(self.pos)
+        if self.paused and not own:
+            self.dwell.reset()
+            return
+        if self.mapper.clutched:
+            self.dwell.reset()
+            return
+        per_target = getattr(self.hooks, "dwell_time_for", None)
+        self.dwell.dwell_time = per_target(own) if per_target else self.settings.dwell_time
+        fired = self.dwell.update(self.pos, t)
+        if fired:
+            self._on_dwell(fired, own)
+
+    def _on_dwell(self, pt, own):
+        if own:
+            self.hooks.ui_dwell(pt)
+            return
+        if self.hooks.popup_visible():       # 메뉴 밖에서 Dwell = 취소
+            self.hooks.hide_popup()
+            self._emit("popup_cancel")
+            return
+        if self.drag_active:
+            winmouse.left_up()
+            self.drag_active = False
+            self.hooks.alert("drag_end")
+            return
+        if self.settings.dwell_popup:
+            self.hooks.show_popup(pt)
+            return
+        self.perform(self.settings.click_type, pt)
+
+    def perform(self, action: str, pt):
+        """클릭 종류를 pt 위치에서 실행 (FR-31)."""
+        self.last_target = pt
+        winmouse.move(*pt)
+        self._last_set = (int(round(pt[0])), int(round(pt[1])))
+        self._emit("click", action, pt)
+        if action == "left":
+            winmouse.left_click()
+        elif action == "right":
+            winmouse.right_click()
+        elif action == "double":
+            winmouse.double_click()
+        elif action == "drag":
+            winmouse.left_down()
+            self.drag_active = True
+            self.hooks.alert("drag_start")
+        elif action == "scroll":
+            self.scroll_anchor = pt
+            self._scroll_still_since = None
+            self.hooks.alert("scroll_start")
+
+    # ---------------- 스크롤 (FR-33) ----------------
+    def _scroll_step(self, t: float):
+        """스크롤 모드: 커서는 기준점에 고정, 포인터를 위/아래로 움직인 만큼 스크롤."""
+        ax, ay = self.scroll_anchor
+        winmouse.move(ax, ay)
+        self._last_set = (int(round(ax)), int(round(ay)))
+        dy = self.pos[1] - ay
+        dead = max(self.settings.dwell_radius, 30)
+        if abs(dy) <= dead:
+            self._scroll_still_since = self._scroll_still_since or t
+            if t - self._scroll_still_since >= self.settings.dwell_time * 1.5:
+                self.scroll_anchor = None    # 가운데에 머물면 스크롤 종료
+                self.dwell.anchor = self.pos  # 바로 다음 Dwell이 이어서 발동하지 않도록
+                self.dwell.armed = False
+                self.hooks.alert("scroll_end")
+            return
+        self._scroll_still_since = None
+        if t - self._last_wheel >= 0.05:
+            rate = min((abs(dy) - dead) / 60.0, 8.0)            # 초당 노치 수
+            winmouse.wheel((-1 if dy > 0 else 1) * rate * (t - self._last_wheel if self._last_wheel else 0.05))
+            self._last_wheel = t
+
+    def _edge_scroll(self, t: float) -> bool:
+        if not self.settings.edge_scroll or self.paused:
+            self._edge_since = None
+            return False
+        band = max(6, self.h * 0.015)
+        y = self.pos[1]
+        direction = 1 if y <= band else -1 if y >= self.h - 1 - band else 0
+        if not direction:
+            self._edge_since = None
+            return False
+        self._edge_since = self._edge_since or t
+        if t - self._edge_since >= 0.5 and t - self._last_wheel >= 0.12:
+            winmouse.wheel(direction)
+            self._last_wheel = t
+        return True
+
+    def scroll_last_target(self, notches: float):
+        """가상 스크롤 버튼: 마지막 클릭 지점의 창을 스크롤."""
+        target = self.last_target or (self.w / 2, self.h / 2)
+        winmouse.wheel_at(*target, notches)

@@ -1,0 +1,13 @@
+# 가상환경·캐시
+.venv/
+__pycache__/
+*.pyc
+# 빌드 산출물
+build/
+dist/
+*.spec
+# 로컬 실행 기록·로그 (사용자 데이터는 %APPDATA%\BodyPointer 에 저장되며 저장소에 올리지 않음)
+*.log
+*.db
+.vscode/
+.idea/
