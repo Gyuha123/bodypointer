@@ -33,9 +33,11 @@ class Engine:
         self.last_seen = None
         self.pos = (self.w / 2, self.h / 2)   # 엔진이 계산한 포인터 위치
         self.drag_active = False
+        self._drag_manual = False             # 제스처로 꾹 누르는 중
         self.scroll_anchor = None
+        self._scroll_manual = False           # 제스처로 시작한 스크롤 (가운데 머물러도 안 끝남)
         self._scroll_still_since = None
-        self.last_target = None               # 마지막으로 클릭한 지점 (가상 스크롤 버튼 대상)
+        self.last_target = None               # 마지막으로 클릭한 지점
         self._last_set = None
         self.override_until = 0.0
         self.clutch_until = 0.0
