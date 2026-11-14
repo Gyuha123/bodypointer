@@ -346,7 +346,7 @@ class GesturePage(QWidget):
 
         start = Card("빠르게 시작", tone="accent")
         start.add(label("처음이라면 추천 세트를 적용해 보세요.  눈썹 올리기 = 클릭  ·  입 벌리기 = 꾹 누르기(드래그)  ·  "
-                        "활짝 웃기 = 스크롤  ·  눈 지그시 감기 = 키보드", "muted", wrap=True))
+                        "활짝 웃기 = 스크롤  ·  두 눈 2초 감기 = 키보드", "muted", wrap=True))
         preset = IconButton("check", "추천 세트 한 번에 적용", "primary")
         preset.clicked.connect(app.apply_gesture_preset)
         clear = IconButton("delete", "모두 해제", "ghost")
