@@ -2,6 +2,7 @@
 import atexit
 import os
 import time
+import webbrowser
 from collections import Counter
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from PySide6.QtCore import QLocale, QObject, QPoint, Qt, QTimer, Signal
 from PySide6.QtWidgets import QAbstractButton, QApplication, QDialog, QHBoxLayout, QMessageBox, QVBoxLayout
 
 from . import profile, vision, winmouse
-from .actions import ALLOWED_WHILE_PAUSED, GESTURE_ONLY, get_action, macro_steps
+from .actions import ALLOWED_WHILE_PAUSED, GESTURE_ONLY, get_action, link_parts, macro_steps
 from .engine import Engine
 from .gestures import GESTURES, PRESET, GestureDetector, personal_threshold
 from .insights import auto_quick_actions, recommend
@@ -724,9 +725,10 @@ class App(QObject):
         return c.most_common(k)
 
     def quick_actions(self):
-        out = [a for a in self.settings.quick_actions if a not in GESTURE_ONLY]
+        no_quick = GESTURE_ONLY | {"link"}
+        out = [a for a in self.settings.quick_actions if a not in no_quick]
         if self.settings.auto_quick:
-            out += [a for a in auto_quick_actions(self.all_sessions()) if a not in out and a not in GESTURE_ONLY]
+            out += [a for a in auto_quick_actions(self.all_sessions()) if a not in out and a not in no_quick]
         return out[:3]
 
     def _refresh_quick_actions(self):
@@ -754,6 +756,22 @@ class App(QObject):
         path = docs / f"BodyPointer_기록_{self.profile_name}_{time.strftime('%Y%m%d')}.csv"
         self.store.export_csv(self.profile_name, path)
         QMessageBox.information(self.window, "내보내기 완료", f"기록을 저장했어요.\n\n{path}")
+
+    def add_link_for_gesture(self, gid):
+        """제스처에 새 링크 연결: 링크 창 → 저장 → 연결."""
+        dlg = LinkDialog(GESTURES[gid].label, self._open_keyboard_for_dialog, self.window)
+        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.action_id:
+            if dlg.action_id not in self.settings.saved_links:
+                self.settings.saved_links.append(dlg.action_id)
+            self.bind_gesture(gid, dlg.action_id)
+        else:
+            self.window.refresh()          # 취소하면 목록을 원래 연결로 되돌린다
+        if self.keyboard.isVisible():
+            self.keyboard._close()
+
+    def _open_keyboard_for_dialog(self):
+        if not self.keyboard.isVisible():
+            self.toggle_keyboard()
 
     def bind_gesture(self, gid, action_id):
         if action_id:
