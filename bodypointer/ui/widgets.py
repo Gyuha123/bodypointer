@@ -252,6 +252,16 @@ class IconLabel(QLabel):
         self.setPixmap(theme.icon(self.name, theme.pal()[self.color_key], self.px).pixmap(self.px, self.px))
 
 
+def fit_to_screen(w: QWidget, pref_w: int, pref_h: int, margin: float = 0.94):
+    """작업 표시줄을 뺀 실제 사용 가능 영역 안에 들어오도록 크기를 정하고 가운데에 둔다."""
+    from PySide6.QtWidgets import QApplication
+    g = QApplication.primaryScreen().availableGeometry()
+    width = min(pref_w, int(g.width() * margin))
+    height = min(pref_h, int(g.height() * margin))
+    w.resize(width, height)
+    w.move(g.x() + (g.width() - width) // 2, g.y() + (g.height() - height) // 2)
+
+
 def hline():
     f = QFrame()
     f.setFixedHeight(1)
