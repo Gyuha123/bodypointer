@@ -129,6 +129,35 @@ class BatchSmoothingTest(unittest.TestCase):
         self.assertEqual(w.brownouts, 3)
 
 
+class PortPickTest(unittest.TestCase):
+    def test_only_headmouse_ports(self):
+        ports = [("COM8", "DCCCE68109C8"), ("COM6", "3C8A1F5DCF96")]
+        names = {"DCCCE68109C8": "Galaxy Buds Pro (09C8)", "3C8A1F5DCF96": "HeadMouse-IMU"}
+        self.assertEqual(remote.pick_bt_ports(ports, names), ["COM6"])     # 이어폰에는 연결 시도 안 함
+
+    def test_unknown_names_try_all(self):
+        ports = [("COM8", "AAAAAAAAAAAA"), ("COM6", "BBBBBBBBBBBB")]
+        self.assertEqual(remote.pick_bt_ports(ports, {}), ["COM8", "COM6"])
+
+    def test_known_but_no_headmouse(self):
+        self.assertEqual(remote.pick_bt_ports([("COM8", "DCCCE68109C8")], {"DCCCE68109C8": "Galaxy Buds"}), [])
+
+    def test_firmware_info_packet(self):
+        data = packet(2, bytes([0x70, 1])) + packet(4, b"BP" + bytes([2, 0]))
+        w = RemoteWorker()
+        w.transport = "블루투스"
+        texts = []
+        w.status.connect(lambda s, t: texts.append(t))
+        old = remote.NO_DATA_TIMEOUT
+        remote.NO_DATA_TIMEOUT = 0.1
+        try:
+            w._read_loop(FakeSerial(data))
+        finally:
+            remote.NO_DATA_TIMEOUT = old
+        self.assertEqual(w.firmware, "2.0")
+        self.assertIn("연동판 펌웨어 2.0", texts[-1])
+
+
 class AxesAndNodTest(unittest.TestCase):
     def test_fit_axes(self):
         axes = fit_axes([-2.0, 1.0, -35.0], [25.0, 3.0, 4.0])

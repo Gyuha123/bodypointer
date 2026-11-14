@@ -232,7 +232,7 @@ class RemoteWorker(QThread):
                         self._set("calibrating", "머리 센서 보정 중 — 2초 동안 머리를 가만히 두세요")
                         last_t = None
                     elif st == 1:
-                        self._set("running", f"머리 센서 연결됨 ({self.transport})")
+                        self._set("running", self._connected_text())
                     else:
                         self._set("error", "머리 센서 오류 — 센서 배선을 확인해 주세요")
                 elif typ == 4 and ln == 4 and payload[:2] == b"BP":
@@ -248,7 +248,7 @@ class RemoteWorker(QThread):
                 elif typ == 1 and ln == 28:
                     t_us, gx, gy, gz, _, _, _ = struct.unpack("<I6f", payload)
                     if self.state not in ("running", "calibrating"):
-                        self._set("running", f"머리 센서 연결됨 ({self.transport})")
+                        self._set("running", self._connected_text())
                     if last_t is not None:
                         dt = ((t_us - last_t) & 0xFFFFFFFF) / 1e6
                         if 0 < dt < 0.1:
@@ -266,6 +266,10 @@ class RemoteWorker(QThread):
                 self.rate_hz = count / (now - t0)
                 count, t0 = 0, now
         return got_any
+
+    def _connected_text(self):
+        fw = f", 연동판 펌웨어 {self.firmware}" if self.firmware else ""
+        return f"머리 센서 연결됨 ({self.transport}{fw})"
 
     # ---- 재생 버퍼: 묶음으로 온 샘플을 장치 시각대로 고르게 풀어 준다 ----
     def _queue(self, now, g, dt):
