@@ -238,8 +238,27 @@ class Engine:
         per_target = getattr(self.hooks, "dwell_time_for", None)
         self.dwell.dwell_time = per_target(own) if per_target else self.settings.dwell_time
         fired = self.dwell.update(self.pos, t)
+        if self.locked_pos is not None:
+            # 떨림 클릭 보조: 게이지가 어느 정도 차면 실제 커서를 기준점에 붙잡아 떨림에 밀리지 않게 한다
+            winmouse.move(*self.locked_pos)
+            self._last_set = (int(round(self.locked_pos[0])), int(round(self.locked_pos[1])))
         if fired:
             self._on_dwell(fired, own)
+
+    LOCK_AT = 0.35
+
+    @property
+    def locked_pos(self):
+        """떨림 클릭 보조로 커서를 붙잡고 있으면 그 위치, 아니면 None."""
+        if getattr(self.settings, "tremor_assist", False) and self.dwell.progress >= self.LOCK_AT \
+                and self.dwell.anchor is not None and self.scroll_anchor is None:
+            return self.dwell.anchor
+        return None
+
+    @property
+    def display_pos(self):
+        """화면에 게이지를 그릴 위치."""
+        return self.scroll_anchor or self.locked_pos or self.pos
 
     def _on_dwell(self, pt, own):
         if own:

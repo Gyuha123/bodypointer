@@ -362,7 +362,7 @@ class App(QObject):
         if not e.control_enabled:
             self.ring.hide()
             return
-        center = self.logical(e.scroll_anchor or e.pos)
+        center = self.logical(e.display_pos)
         on_kb = self.keyboard.isVisible() and self.keyboard.frameGeometry().contains(center)
         st = {
             "center": (center.x(), center.y()),
