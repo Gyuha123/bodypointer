@@ -36,7 +36,7 @@ C_A = winmouse.MOD_CONTROL | winmouse.MOD_ALT
 HOTKEYS = {
     "pause": (0, winmouse.VK_PAUSE), "pause2": (C_A, ord("P")), "next": (C_A, ord("N")),
     "clutch": (C_A, ord("C")), "control": (C_A, ord("M")), "settings": (C_A, ord("S")),
-    "keyboard": (C_A, ord("K")),
+    "keyboard": (C_A, ord("K")), "quit": (C_A, ord("Q")),
 }
 THEME_KEYS = {"high_contrast", "large_text"}
 SLIDER_KEYS = {"filter_strength", "sensitivity", "rel_gain", "accel", "dwell_time", "dwell_radius",
