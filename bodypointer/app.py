@@ -20,6 +20,7 @@ from .stabilize import PointStabilizer
 from .ui import theme
 from .ui.calibration import CalibrationWidget
 from .ui.keyboard import KeyboardBar
+from .ui.link_dialog import LinkDialog
 from .ui.main_window import MainWindow
 from .ui.overlay import Banner, CursorRing
 from .ui.preview import CameraPreview
