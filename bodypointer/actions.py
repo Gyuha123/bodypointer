@@ -3,6 +3,7 @@
 kind:
   keys  - 단축키 조합 전송
   app   - BodyPointer 자체 기능 (앱이 처리)
+  hold  - 표정을 유지하는 동안 계속되는 동작 (제스처 전용: 시작/끝 두 번 호출)
   macro - 여러 동작을 차례로 실행 ("macro:select_all+copy")
 """
 from dataclasses import dataclass
@@ -15,48 +16,63 @@ class Action:
     icon: str
     kind: str = "keys"
     keys: tuple = ()
+    group: str = "편집"
+
+
+def _k(id_, label, icon, *keys, group="편집"):
+    return Action(id_, label, icon, "keys", keys, group)
 
 
 ACTIONS: dict[str, Action] = {a.id: a for a in [
-    Action("copy", "복사", "copy", keys=("ctrl", "c")),
-    Action("paste", "붙여넣기", "paste", keys=("ctrl", "v")),
-    Action("cut", "잘라내기", "cut", keys=("ctrl", "x")),
-    Action("undo", "실행 취소", "undo", keys=("ctrl", "z")),
-    Action("redo", "다시 실행", "redo", keys=("ctrl", "y")),
-    Action("select_all", "전체 선택", "select_all", keys=("ctrl", "a")),
-    Action("enter", "엔터", "enter", keys=("enter",)),
-    Action("backspace", "지우기", "backspace", keys=("backspace",)),
-    Action("delete", "Delete", "delete", keys=("delete",)),
-    Action("tab", "Tab", "tab", keys=("tab",)),
-    Action("esc", "Esc", "close", keys=("esc",)),
-    Action("left", "←", "chevron_left", keys=("left",)),
-    Action("right", "→", "chevron_right", keys=("right",)),
-    Action("up", "↑", "up", keys=("up",)),
-    Action("down", "↓", "down", keys=("down",)),
-    Action("browser_back", "뒤로 가기", "back", keys=("alt", "left")),
-    Action("refresh", "새로고침", "refresh", keys=("f5",)),
-    Action("new_tab", "새 탭", "add", keys=("ctrl", "t")),
-    Action("close_tab", "탭 닫기", "close", keys=("ctrl", "w")),
-    Action("switch_window", "창 전환", "switch", keys=("alt", "tab")),
-    Action("zoom_in", "확대", "zoom_in", keys=("ctrl", "plus")),
-    Action("zoom_out", "축소", "zoom_out", keys=("ctrl", "minus")),
-    Action("save_file", "파일 저장", "save", keys=("ctrl", "s")),
-    Action("find", "찾기", "search", keys=("ctrl", "f")),
-    Action("page_down", "페이지 아래", "down", keys=("pagedown",)),
-    Action("page_up", "페이지 위", "up", keys=("pageup",)),
-    # 앱 기능
-    Action("click", "바로 클릭", "touch", "app"),
-    Action("double_click", "더블클릭", "touch", "app"),
-    Action("right_click", "우클릭", "mouse", "app"),
-    Action("toggle_pause", "일시정지/재개", "pause", "app"),
-    Action("toggle_keyboard", "키보드 열기/닫기", "keyboard", "app"),
-    Action("next_part", "부위 바꾸기", "sync", "app"),
+    # 마우스 (제스처로 쓰기 좋은 것)
+    Action("click", "바로 클릭", "touch", "app", group="마우스"),
+    Action("double_click", "더블클릭", "touch", "app", group="마우스"),
+    Action("right_click", "우클릭", "mouse", "app", group="마우스"),
+    Action("drag_hold", "꾹 누르기 (표정 유지하는 동안)", "select_all", "hold", group="마우스"),
+    Action("drag_toggle", "꾹 누르기 켜기/끄기", "select_all", "app", group="마우스"),
+    Action("scroll_hold", "스크롤 (표정 유지하는 동안)", "switch", "hold", group="마우스"),
+    Action("scroll_toggle", "스크롤 켜기/끄기", "switch", "app", group="마우스"),
+    # 편집
+    _k("copy", "복사", "copy", "ctrl", "c"),
+    _k("paste", "붙여넣기", "paste", "ctrl", "v"),
+    _k("cut", "잘라내기", "cut", "ctrl", "x"),
+    _k("undo", "실행 취소", "undo", "ctrl", "z"),
+    _k("redo", "다시 실행", "redo", "ctrl", "y"),
+    _k("select_all", "전체 선택", "select_all", "ctrl", "a"),
+    _k("enter", "엔터", "enter", "enter"),
+    _k("backspace", "지우기", "backspace", "backspace"),
+    _k("delete", "Delete", "delete", "delete"),
+    _k("tab", "Tab", "tab", "tab"),
+    _k("esc", "Esc", "close", "esc"),
+    _k("left", "←", "chevron_left", "left"),
+    _k("right", "→", "chevron_right", "right"),
+    _k("up", "↑", "up", "up"),
+    _k("down", "↓", "down", "down"),
+    _k("save_file", "파일 저장", "save", "ctrl", "s"),
+    _k("find", "찾기", "search", "ctrl", "f"),
+    # 탐색
+    _k("browser_back", "뒤로 가기", "back", "alt", "left", group="탐색"),
+    _k("refresh", "새로고침", "refresh", "f5", group="탐색"),
+    _k("new_tab", "새 탭", "add", "ctrl", "t", group="탐색"),
+    _k("close_tab", "탭 닫기", "close", "ctrl", "w", group="탐색"),
+    _k("switch_window", "창 전환", "switch", "alt", "tab", group="탐색"),
+    _k("zoom_in", "확대", "zoom_in", "ctrl", "plus", group="탐색"),
+    _k("zoom_out", "축소", "zoom_out", "ctrl", "minus", group="탐색"),
+    _k("page_down", "페이지 아래", "down", "pagedown", group="탐색"),
+    _k("page_up", "페이지 위", "up", "pageup", group="탐색"),
+    # 앱
+    Action("toggle_pause", "클릭 멈춤/재개", "pause", "app", group="앱"),
+    Action("toggle_keyboard", "키보드 열기/닫기", "keyboard", "app", group="앱"),
+    Action("next_part", "부위 바꾸기", "sync", "app", group="앱"),
 ]}
 
+GROUP_ORDER = ["마우스", "편집", "탐색", "앱"]
 # 키보드 바 편집 패널에 놓을 동작
 EDIT_KEYS = ["copy", "paste", "cut", "undo", "select_all", "delete", "left", "right", "up", "down", "tab", "esc"]
 # 일시정지 중에도 실행되는 동작
 ALLOWED_WHILE_PAUSED = {"toggle_pause", "toggle_keyboard"}
+# 툴바·키보드에서는 쓸 수 없는 제스처 전용 동작
+GESTURE_ONLY = {a.id for a in ACTIONS.values() if a.kind == "hold"}
 
 
 def get_action(action_id: str) -> Action | None:
