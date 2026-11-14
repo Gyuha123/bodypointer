@@ -50,54 +50,79 @@ def _tool(icon, text, w=92, h=66, checkable=False):
 class Toolbar(FloatingPanel):
     pauseClicked = Signal()
     clickModeClicked = Signal()
-    scrollUp = Signal()
-    scrollDown = Signal()
+    scrollClicked = Signal()
     keyboardClicked = Signal()
     saveClicked = Signal()
     nextPart = Signal()
     clutch = Signal()
     settings = Signal()
     quickAction = Signal(str)
+    collapseToggled = Signal(bool)
 
     def __init__(self):
         super().__init__("toolbar")
         self.setWindowTitle("BodyPointer 툴바")
         lay = QVBoxLayout(self.panel)
-        lay.setContentsMargins(8, 10, 8, 10)
+        lay.setContentsMargins(8, 8, 8, 10)
         lay.setSpacing(6)
+        # 접기/펼치기: 접으면 재개/정지만 남는다 (언제든 클릭을 멈출 수 있게)
+        self.collapse_btn = IconButton("up", "접기", overlay=True, icon_size=16)
+        self.collapse_btn.setProperty("variant", "ghost")
+        self.collapse_btn.setFixedSize(92, 40)
+        self.collapse_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.collapse_btn.clicked.connect(lambda: self.set_collapsed(not self.collapsed, emit=True))
+        lay.addWidget(self.collapse_btn)
         self.pause_btn = _tool("play", "재개")
+        lay.addWidget(self.pause_btn)
+
+        self.body = QWidget()
+        body = QVBoxLayout(self.body)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(6)
         self.mode_btn = _tool("mouse", "메뉴")
-        self.up_btn = _tool("up", "위로")
-        self.down_btn = _tool("down", "아래로")
+        self.scroll_btn = _tool("switch", "스크롤")
+        self.scroll_btn.setToolTip("마지막으로 클릭한 곳에서 위·아래로 움직인 만큼 스크롤 (가운데 머무르면 끝)")
         self.kb_btn = _tool("keyboard", "키보드", checkable=True)
         self.part_btn = _tool("sync", "부위")
         self.clutch_btn = _tool("clutch", "고정")
         self.save_btn = _tool("save", "저장")
         self.settings_btn = _tool("settings", "설정")
         for b, sig in [(self.pause_btn, self.pauseClicked), (self.mode_btn, self.clickModeClicked),
-                       (self.up_btn, self.scrollUp), (self.down_btn, self.scrollDown),
-                       (self.kb_btn, self.keyboardClicked), (self.part_btn, self.nextPart),
-                       (self.clutch_btn, self.clutch), (self.save_btn, self.saveClicked),
-                       (self.settings_btn, self.settings)]:
+                       (self.scroll_btn, self.scrollClicked), (self.kb_btn, self.keyboardClicked),
+                       (self.part_btn, self.nextPart), (self.clutch_btn, self.clutch),
+                       (self.save_btn, self.saveClicked), (self.settings_btn, self.settings)]:
             b.clicked.connect(sig.emit)
-        for b in (self.pause_btn, self.mode_btn, self.up_btn, self.down_btn, self.kb_btn):
-            lay.addWidget(b)
+        for b in (self.mode_btn, self.scroll_btn, self.kb_btn):
+            body.addWidget(b)
         # 빠른 실행: 자주 쓴 기능이 자동으로 올라온다
         self.quick_title = label("빠른 실행", "muted", align=Qt.AlignmentFlag.AlignCenter)
-        lay.addWidget(self.quick_title)
+        body.addWidget(self.quick_title)
         self.quick_box = QVBoxLayout()
         self.quick_box.setSpacing(6)
-        lay.addLayout(self.quick_box)
+        body.addLayout(self.quick_box)
         self.quick_buttons = []
         for b in (self.part_btn, self.clutch_btn, self.save_btn, self.settings_btn):
-            lay.addWidget(b)
-        self.scroll_buttons = {self.up_btn: 1, self.down_btn: -1}
+            body.addWidget(b)
+        lay.addWidget(self.body)
+        self.collapsed = False
         self.set_quick_actions([])
 
+    def set_collapsed(self, collapsed: bool, emit=False):
+        self.collapsed = collapsed
+        self.body.setVisible(not collapsed)
+        self.collapse_btn.setText("펼치기" if collapsed else "접기")
+        self.collapse_btn.set_icon_name("down" if collapsed else "up")
+        self.place()
+        if emit:
+            self.collapseToggled.emit(collapsed)
+
     def place(self):
+        self.panel.adjustSize()
         self.adjustSize()
         g = QApplication.primaryScreen().availableGeometry()
-        self.move(g.right() - self.width() + 2, g.top() + max(0, (g.height() - self.height()) // 2))
+        h = min(self.sizeHint().height(), g.height())
+        self.resize(self.sizeHint().width(), h)
+        self.move(g.right() - self.width() + 2, g.top() + max(0, (g.height() - h) // 2))
 
     def set_paused(self, paused: bool):
         self.pause_btn.setText("재개" if paused else "정지")
