@@ -194,6 +194,12 @@ class RemoteWorker(QThread):
                         self._set("running", f"머리 센서 연결됨 ({self.transport})")
                     else:
                         self._set("error", "머리 센서 오류 — 센서 배선을 확인해 주세요")
+                elif typ == 3 and ln >= 20:
+                    flags = struct.unpack("<I", payload[16:20])[0]
+                    reason, brownouts = (flags >> 8) & 0xFF, flags >> 16
+                    if (reason, brownouts) != (self.reset_reason, self.brownouts):
+                        self.reset_reason, self.brownouts = reason, brownouts
+                        self.power.emit(reason, brownouts)
                 elif typ == 1 and ln == 28:
                     t_us, gx, gy, gz, _, _, _ = struct.unpack("<I6f", payload)
                     if self.state not in ("running", "calibrating"):
@@ -201,22 +207,48 @@ class RemoteWorker(QThread):
                     if last_t is not None:
                         dt = ((t_us - last_t) & 0xFFFFFFFF) / 1e6
                         if 0 < dt < 0.1:
-                            g = (gx, gy, gz)
-                            rates.append(g)
-                            for k in range(3):
-                                if abs(g[k]) > DEADBAND_DPS:
-                                    acc[k] += g[k] * dt
+                            self._dev_s += dt
+                            self._queue(now, (gx, gy, gz), dt)
+                        else:
+                            self._offset = None      # 시각이 끊겼으면 다시 맞춘다
                     last_t = t_us
                     count += 1
-            if now - last_emit >= EMIT_INTERVAL and rates:
-                mean = tuple(sum(r[k] for r in rates) / len(rates) for k in range(3))
-                self.motion.emit(now, tuple(acc), mean)
-                acc = [0.0, 0.0, 0.0]
-                last_emit = now
+            self._release(now)
+            if now - last_emit >= EMIT_INTERVAL:
+                if self._emit(now):
+                    last_emit = now
             if now - t0 >= 1.0:
                 self.rate_hz = count / (now - t0)
                 count, t0 = 0, now
         return got_any
+
+    # ---- 재생 버퍼: 묶음으로 온 샘플을 장치 시각대로 고르게 풀어 준다 ----
+    def _queue(self, now, g, dt):
+        cur = now - self._dev_s
+        if self._offset is None or cur < self._offset:
+            self._offset = cur                   # 가장 빨리 도착한 샘플이 실제 시각에 가장 가깝다
+        else:
+            self._offset += CLOCK_DRIFT * max(now - self._offset_t, 0.0)   # 시계 차이를 천천히 따라감
+            self._offset = min(self._offset, cur)
+        self._offset_t = now
+        self._pending.append((self._dev_s, g, dt))
+
+    def _release(self, now):
+        while self._pending and (now == float("inf") or
+                                 self._pending[0][0] + self._offset + PLAYOUT_DELAY <= now):
+            _, g, dt = self._pending.popleft()
+            self._rates.append(g)
+            for k in range(3):
+                if abs(g[k]) > DEADBAND_DPS:
+                    self._acc[k] += g[k] * dt
+
+    def _emit(self, now) -> bool:
+        if not self._rates:
+            return False
+        mean = tuple(sum(r[k] for r in self._rates) / len(self._rates) for k in range(3))
+        self.motion.emit(now, tuple(self._acc), mean)
+        self._acc = [0.0, 0.0, 0.0]
+        return True
 
 
 class NodDetector:
