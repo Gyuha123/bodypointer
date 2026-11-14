@@ -261,15 +261,20 @@ class MovePage(QWidget):
 
         tune = Card("세부 조절", "처음엔 그대로 두고, 불편할 때만 조금씩 바꿔 보세요.")
         self.rows = {
-            "filter_strength": SliderRow("떨림 보정", "커서가 떨리면 올리고, 굼뜨면 내려요.", 0, 100, 5, s.filter_strength, "{:.0f}"),
-            "sensitivity": SliderRow("감도", "화면 끝까지 잘 안 닿으면 올려요. (절대 모드)", 0.5, 3.0, 0.1, s.sensitivity),
-            "rel_gain": SliderRow("속도", "커서가 움직이는 거리예요. (상대 모드)", 0.3, 5.0, 0.1, s.rel_gain),
+            "filter_strength": SliderRow("떨림 보정", "커서가 떨리면 올리고, 굼뜨면 내려요. 떨림이 심하면 120~200까지 올려 보세요.", 0, 200, 5, s.filter_strength, "{:.0f}"),
+            "sensitivity": SliderRow("감도", "카메라와 멀거나 조금만 움직여도 화면 끝까지 가게 하려면 올려요. (절대 모드, 최대 8배)", 0.5, 8.0, 0.1, s.sensitivity),
+            "rel_gain": SliderRow("속도", "조금 움직여도 멀리 가게 하려면 올려요. (상대 모드, 최대 12배)", 0.3, 12.0, 0.1, s.rel_gain),
             "accel": SliderRow("가속", "빨리 움직이면 더 멀리 가요. (상대 모드)", 0.0, 1.5, 0.1, s.accel),
         }
         for key, r in self.rows.items():
             r.valueChanged.connect(lambda v, k=key: app.update(k, v))
             tune.add(r)
         lay.addWidget(tune)
+        shaky = Card("떨림이 심한가요?", "한 번에 떨림 보정 160 · 허용 범위 80px · 떨림 클릭 보조를 켜요. 이후에 조금씩 조절하세요.", tone="accent")
+        shaky_btn = IconButton("pulse", "떨림이 심해요 — 한 번에 맞추기", "primary")
+        shaky_btn.clicked.connect(app.apply_tremor_preset)
+        shaky.add(row(shaky_btn, None))
+        lay.addWidget(shaky)
         calib = IconButton("ruler", "가동 범위 다시 측정", "primary")
         calib.clicked.connect(app.open_calibration)
         lay.addLayout(row(calib, None))
@@ -297,7 +302,7 @@ class ClickPage(QWidget):
         dwell = Card("머무르기")
         self.rows = {
             "dwell_time": SliderRow("머무는 시간", "실수로 자꾸 눌리면 늘리고, 답답하면 줄여요.", 0.5, 3.0, 0.1, s.dwell_time, "{:.1f}초"),
-            "dwell_radius": SliderRow("허용 범위", "손이 떨려 게이지가 자꾸 끊기면 넓혀요.", 15, 90, 5, s.dwell_radius, "{:.0f}px"),
+            "dwell_radius": SliderRow("허용 범위", "떨려서 게이지가 자꾸 처음부터 다시 차면 넓혀요.", 15, 150, 5, s.dwell_radius, "{:.0f}px"),
             "kb_dwell_time": SliderRow("키보드 머무는 시간", "키가 너무 빨리 눌리면 늘리고, 익숙해지면 조금씩 줄여요.", 0.6, 3.0, 0.1, s.kb_dwell_time, "{:.1f}초"),
         }
         for key, r in self.rows.items():
@@ -310,6 +315,10 @@ class ClickPage(QWidget):
                                s.dwell_popup)
         self.popup.toggled.connect(lambda v: app.update("dwell_popup", v))
         how.add(self.popup)
+        self.tremor = ToggleRow("떨림 클릭 보조", "게이지가 차는 중 잠깐 튀어도 끊기지 않고, 게이지가 어느 정도 차면 커서를 "
+                                "그 자리에 붙잡아 원하는 곳이 눌려요. 떨림이 있으면 켜 두세요.", s.tremor_assist)
+        self.tremor.toggled.connect(lambda v: app.update("tremor_assist", v))
+        how.add(self.tremor)
         how.add(label("메뉴를 끄면 바로 할 동작", "muted"))
         self.click_type = Segmented([("left", "touch", "클릭"), ("double", "touch", "더블"),
                                      ("right", "mouse", "우클릭"), ("drag", "select_all", "드래그")])
@@ -332,6 +341,7 @@ class ClickPage(QWidget):
         for key, r in self.rows.items():
             r.set_value(getattr(s, key))
         self.popup.set_checked(s.dwell_popup)
+        self.tremor.set_checked(s.tremor_assist)
         self.edge.set_checked(s.edge_scroll)
         self.click_type.set_current(s.click_type)
 

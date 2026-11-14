@@ -106,8 +106,8 @@ def recommend(sessions: list[dict], settings) -> list[Rec]:
                             "good", {"type": "set", "key": "dwell_time", "value": v}))
 
     # 4. 떨림이 크면 보정 강화 (FR-42)
-    if agg["jitter"] and statistics.median(agg["jitter"]) > 2.5 and settings.filter_strength < 85:
-        v = min(settings.filter_strength + 10, 95)
+    if agg["jitter"] and statistics.median(agg["jitter"]) > 2.5 and settings.filter_strength < 180:
+        v = min(settings.filter_strength + 20, 200)
         recs.append(Rec("filter_up", "pulse", "커서가 조금 떨리고 있어요",
                         f"떨림 보정을 {settings.filter_strength:.0f} → {v:.0f}으로 높이면 더 안정돼요.",
                         "tip", {"type": "set", "key": "filter_strength", "value": v}))
