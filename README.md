@@ -68,6 +68,7 @@ bodypointer/
   usage.py        사용 기록 수집·저장 (SQLite)
   insights.py     기록 분석 → 맞춤 추천
   ui/             디자인 시스템, 메인 창(사이드바 8페이지), 툴바, 키보드 바, 차트, 마법사
+firmware/         머리 센서(HeadMouse-IMU, ESP32) 연동판 펌웨어 v2.0 — 소스(.ino)와 빌드된 .bin, 굽는 방법은 firmware/README.md
 tests/            단위 테스트 27개 (python -m unittest discover tests)
 ```
 
