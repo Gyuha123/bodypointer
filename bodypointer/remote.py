@@ -24,8 +24,11 @@ ESP_VIDS = {0x10C4, 0x1A86, 0x303A, 0x0403}      # CP210x, CH340, Espressif, FTD
 HEADER = b"\xA5\x5B"
 NO_DATA_TIMEOUT = 4.0
 FAILED_PORT_BACKOFF = 60.0                       # 우리 센서가 아닌 포트는 1분 동안 다시 시도하지 않음
-EMIT_INTERVAL = 0.012                            # 약 80Hz로 묶어서 UI에 전달
+EMIT_INTERVAL = 0.010                            # 약 100Hz로 UI에 전달
 DEADBAND_DPS = 1.5                               # 이보다 느린 회전은 무시 (가만히 있을 때 흐름 방지)
+PLAYOUT_DELAY = 0.05                             # 재생 버퍼 지연 (펌웨어 묶음 40ms + 여유)
+CLOCK_DRIFT = 0.002                              # 장치·PC 시계 차이가 천천히 달라지는 것을 따라가는 정도 (초/초)
+RESET_BROWNOUT = 9                               # esp_reset_reason: 저전압
 
 
 def find_ports():
@@ -50,6 +53,7 @@ class RemoteWorker(QThread):
     """백그라운드에서 연결·수신. motion(t, (d0, d1, d2), (r0, r1, r2)): 센서 축별 회전 각도 변화(도)와 각속도(도/초)."""
     motion = Signal(float, object, object)
     status = Signal(str, str)        # (상태, 설명) 상태: searching / connecting / calibrating / running / error / off
+    power = Signal(int, int)         # (직전 리셋 원인, 저전압 리셋 횟수) — 바뀔 때만
 
     def __init__(self):
         super().__init__()
@@ -60,6 +64,8 @@ class RemoteWorker(QThread):
         self.transport = ""
         self.rate_hz = 0.0
         self.last_rx = 0.0
+        self.reset_reason = None
+        self.brownouts = 0
 
     # ---- 메인 스레드에서 ----
     def recalibrate(self):
@@ -106,7 +112,7 @@ class RemoteWorker(QThread):
                     break
                 self._set("connecting", f"{dev} ({kind}) 연결 시도 중")
                 try:
-                    ser = serial.Serial(dev, 921600, timeout=0.1, write_timeout=1)
+                    ser = serial.Serial(dev, 921600, timeout=0.005, write_timeout=1)
                 except Exception:
                     self._failed[dev] = time.monotonic()
                     continue
@@ -140,8 +146,12 @@ class RemoteWorker(QThread):
         got_any = False
         last_rx = time.monotonic()
         last_t = None
-        acc = [0.0, 0.0, 0.0]
-        rates = deque(maxlen=8)
+        self._acc = [0.0, 0.0, 0.0]
+        self._rates = deque(maxlen=8)
+        self._pending = deque()          # 재생 버퍼: (장치 시각 s, (gx, gy, gz), dt)
+        self._dev_s = 0.0                # 장치 시각 (32비트 마이크로초 넘침을 풀어 누적)
+        self._offset = None              # PC 시각 - 장치 시각 (가장 빨리 도착한 값 기준)
+        self._offset_t = 0.0
         last_emit = time.monotonic()
         count, t0 = 0, time.monotonic()
         while not self._stop:
@@ -150,6 +160,8 @@ class RemoteWorker(QThread):
             if data:
                 buf += data
             elif now - last_rx > NO_DATA_TIMEOUT:
+                self._release(float("inf"))
+                self._emit(now)
                 return got_any
             while True:
                 i = buf.find(HEADER)
