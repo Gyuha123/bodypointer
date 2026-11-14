@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QAbstractButton, QApplication, QDialog, QHBoxLayou
 from . import profile, vision, winmouse
 from .actions import ALLOWED_WHILE_PAUSED, GESTURE_ONLY, get_action, macro_steps
 from .engine import Engine
-from .gestures import GESTURES, GestureDetector
+from .gestures import GESTURES, PRESET, GestureDetector, personal_threshold
 from .insights import auto_quick_actions, recommend
 from .parts import get_part
 from .predict import Predictor
@@ -22,7 +22,7 @@ from .ui.main_window import MainWindow
 from .ui.overlay import Banner, CursorRing
 from .ui.preview import CameraPreview
 from .ui.toolbar import CLICK_CYCLE, ClickPopup, Toolbar
-from .ui.widgets import Card, IconButton, refresh_icons
+from .ui.widgets import Card, IconButton, fit_to_screen, refresh_icons
 from .ui.wizard import SetupWizard
 from .usage import SessionRecorder, UsageStore
 
