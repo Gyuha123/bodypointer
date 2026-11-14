@@ -79,6 +79,28 @@ class FilterTest(unittest.TestCase):
         self.assertLessEqual(max(xs) - min(xs), 6.0)   # ±3px
         self.assertLessEqual(max(ys) - min(ys), 6.0)
 
+    def test_strong_tremor_filtered(self):
+        """심한 떨림(±15px)도 떨림 보정 200이면 정지 시 커서가 거의 움직이지 않는다."""
+        random.seed(2)
+        f = PointFilter(strength=200)
+        outs = []
+        for i in range(300):
+            x, y = f(500 + random.gauss(0, 7), 400 + random.gauss(0, 7), i / 30)
+            if i > 90:
+                outs.append((x, y))
+        xs, ys = [o[0] for o in outs], [o[1] for o in outs]
+        self.assertLessEqual(max(xs) - min(xs), 8.0)
+        self.assertLessEqual(max(ys) - min(ys), 8.0)
+
+    def test_rubber_band_is_smooth(self):
+        """반경을 넘으면 넘은 만큼만 따라간다 (뚝 점프하지 않음)."""
+        f = PointFilter(strength=0)
+        f.deadband = 10
+        f(0, 0, 0)
+        steps = [f(x, 0, i * 0.033)[0] for i, x in enumerate(range(0, 200, 4), start=1)]
+        jumps = [b - a for a, b in zip(steps, steps[1:])]
+        self.assertLess(max(jumps), 12)
+
     def test_follows_fast_motion(self):
         f = PointFilter(strength=60)
         for i in range(60):
@@ -126,6 +148,31 @@ class DwellTest(unittest.TestCase):
         d.update((300, 300), 3.0)                  # 반경 밖으로 이동 → 재무장
         fired = [d.update((300, 300), 3.0 + i / 30) for i in range(40)]
         self.assertEqual(sum(f is not None for f in fired), 1)
+
+
+class TremorDwellTest(unittest.TestCase):
+    def test_grace_keeps_progress_through_brief_excursions(self):
+        d = DwellDetector(1.0, 30, grace=0.4)
+        fired = []
+        for i in range(60):                        # 2초, 0.3초마다 반경 밖으로 잠깐(0.1초) 튐
+            t = i / 30
+            pos = (160, 100) if i % 9 in (0, 1, 2) else (100, 100)
+            fired.append(d.update(pos, t))
+        self.assertTrue(any(f is not None for f in fired))
+
+    def test_without_grace_excursions_reset(self):
+        d = DwellDetector(1.0, 30, grace=0.0)
+        fired = [d.update((160, 100) if i % 9 in (0, 1, 2) else (100, 100), i / 30) for i in range(60)]
+        self.assertTrue(all(f is None for f in fired))
+
+    def test_long_move_away_still_resets(self):
+        d = DwellDetector(1.0, 30, grace=0.4)
+        for i in range(15):
+            d.update((100, 100), i / 30)
+        for i in range(20):                        # 0.66초 동안 다른 곳 → 다시 시작
+            d.update((400, 400), 0.5 + i / 30)
+        self.assertLess(d.progress, 0.6)
+        self.assertGreater(math.dist(d.anchor, (100, 100)), 100)
 
 
 class EngineTest(unittest.TestCase):
@@ -220,6 +267,23 @@ class EngineTest(unittest.TestCase):
         self.assertTrue(wheels and all(w > 0 for w in wheels))
         self.e.stop_scroll()
         self.assertIsNone(self.e.scroll_anchor)
+
+    def test_tremor_click_lands_on_target(self):
+        """떨림 클릭 보조: 떨리는 손으로도 머무르기 클릭이 되고, 목표 근처를 누른다."""
+        random.seed(5)
+        self.e.settings.tremor_assist = True
+        self.e.apply_settings(self.e.settings)
+        self.e.set_paused(False)
+        self.run_still(0.3)
+        clicks = []
+        for _ in range(int(3 * 30)):                # 3초 동안 목표(가운데) 주변에서 크게 떨림
+            self.t += 1 / 30
+            jitter = (0.5 + random.gauss(0, 0.012), 0.5 + random.gauss(0, 0.012))
+            self.e.on_point(jitter, self.t)
+            if self.mouse.count("left_click") > len(clicks):
+                clicks.append(self.mouse.pos)
+        self.assertGreaterEqual(len(clicks), 1)
+        self.assertLess(math.dist(clicks[0], (960, 540)), 40)
 
     def test_scroll_pick_targets_where_user_dwells(self):
         """툴바 '스크롤' → 다음에 머무른 곳에서 스크롤 시작 (일시정지 중·BodyPointer 창 위에서도)."""
