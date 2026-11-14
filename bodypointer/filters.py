@@ -44,7 +44,14 @@ class OneEuroFilter:
 
 
 class PointFilter:
-    """2D 좌표 필터. strength 0(약)~100(강)."""
+    """2D 좌표 필터. strength 0(약)~100(강)~200(아주 강함: 떨림이 심한 경우).
+
+    1단계 One Euro Filter로 고주파 떨림을 줄이고,
+    2단계 '고무줄' 데드밴드: 출력은 입력이 일정 반경을 벗어날 때만, 벗어난 만큼만 따라간다.
+    (예전처럼 반경을 넘는 순간 뚝 점프하지 않아 부드럽다)
+    """
+
+    MAX_STRENGTH = 200.0
 
     def __init__(self, strength: float = 60):
         self.fx, self.fy = OneEuroFilter(), OneEuroFilter()
@@ -52,12 +59,14 @@ class PointFilter:
         self.set_strength(strength)
 
     def set_strength(self, strength: float):
-        s = max(0.0, min(100.0, strength)) / 100.0
-        min_cutoff = 4.0 * (0.03 / 4.0) ** s       # 4Hz(약) ~ 0.03Hz(강), 로그 보간
-        beta = 0.02 * (1.0 - 0.7 * s)              # 빠른 움직임엔 지연을 줄인다 (px/s 단위)
+        s = max(0.0, min(self.MAX_STRENGTH, strength)) / 100.0
+        s1, extra = min(s, 1.0), max(0.0, s - 1.0)   # extra: 100을 넘는 '심한 떨림' 구간 (0~1)
+        min_cutoff = 4.0 * (0.03 / 4.0) ** s1        # 4Hz(약) ~ 0.03Hz(강), 로그 보간
+        min_cutoff *= 1.0 - 0.6 * extra              # 200이면 0.012Hz까지
+        beta = 0.02 * (1.0 - 0.7 * s1) * (1.0 - 0.5 * extra)
         for f in (self.fx, self.fy):
             f.min_cutoff, f.beta = min_cutoff, beta
-        self.deadband = 1.0 + 3.0 * s              # 정지 상태 미세 떨림 무시(px)
+        self.deadband = 1.0 + 3.0 * s1 + 11.0 * extra   # 고무줄 반경(px): 4px(100) ~ 15px(200)
 
     def reset(self):
         self.fx.reset()
@@ -66,7 +75,12 @@ class PointFilter:
 
     def __call__(self, x: float, y: float, t: float) -> tuple[float, float]:
         fx, fy = self.fx(x, t), self.fy(y, t)
-        if self.out is not None and math.hypot(fx - self.out[0], fy - self.out[1]) < self.deadband:
+        if self.out is None:
+            self.out = (fx, fy)
             return self.out
-        self.out = (fx, fy)
+        dx, dy = fx - self.out[0], fy - self.out[1]
+        d = math.hypot(dx, dy)
+        if d > self.deadband:
+            k = (d - self.deadband) / d               # 반경 밖으로 나간 만큼만 따라간다
+            self.out = (self.out[0] + dx * k, self.out[1] + dy * k)
         return self.out
