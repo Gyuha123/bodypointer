@@ -238,22 +238,41 @@ class Engine:
         per_target = getattr(self.hooks, "dwell_time_for", None)
         self.dwell.dwell_time = per_target(own) if per_target else self.settings.dwell_time
         fired = self.dwell.update(self.pos, t)
-        if self.locked_pos is not None:
-            # 떨림 클릭 보조: 게이지가 어느 정도 차면 실제 커서를 기준점에 붙잡아 떨림에 밀리지 않게 한다
-            winmouse.move(*self.locked_pos)
-            self._last_set = (int(round(self.locked_pos[0])), int(round(self.locked_pos[1])))
+        self._update_lock()
+        if self._locked:
+            # 떨림 클릭 보조: 멈춰서 게이지를 채우는 중이면 실제 커서를 기준점에 붙잡아 떨림에 밀리지 않게 한다
+            winmouse.move(*self.dwell.anchor)
+            self._last_set = (int(round(self.dwell.anchor[0])), int(round(self.dwell.anchor[1])))
         if fired:
+            self._locked = False
             self._on_dwell(fired, own)
 
-    LOCK_AT = 0.35
+    LOCK_AT = 0.5             # 게이지가 이만큼 찼고
+    LOCK_SPEED = 60.0         # 포인터 속도(px/s, 평균)가 이보다 느릴 때만 붙잡는다 → 천천히 이동 중엔 붙잡지 않음
+    UNLOCK_SPEED = 160.0      # 이보다 빨라지면 바로 놓는다
+
+    def _track_speed(self, t):
+        if self._prev_pos is not None and t > self._prev_t:
+            v = math.dist(self.pos, self._prev_pos) / (t - self._prev_t)
+            self._speed = 0.75 * self._speed + 0.25 * v
+        self._prev_pos, self._prev_t = self.pos, t
+
+    def _update_lock(self):
+        d = self.dwell
+        if not getattr(self.settings, "tremor_assist", False) or d.anchor is None or d.progress <= 0 \
+                or self.scroll_anchor is not None:
+            self._locked = False
+            return
+        if self._locked:
+            if self._speed > self.UNLOCK_SPEED or math.dist(self.pos, d.anchor) > d.radius * 0.75:
+                self._locked = False
+        elif d.progress >= self.LOCK_AT and self._speed < self.LOCK_SPEED:
+            self._locked = True
 
     @property
     def locked_pos(self):
         """떨림 클릭 보조로 커서를 붙잡고 있으면 그 위치, 아니면 None."""
-        if getattr(self.settings, "tremor_assist", False) and self.dwell.progress >= self.LOCK_AT \
-                and self.dwell.anchor is not None and self.scroll_anchor is None:
-            return self.dwell.anchor
-        return None
+        return self.dwell.anchor if self._locked else None
 
     @property
     def display_pos(self):

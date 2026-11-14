@@ -62,11 +62,11 @@ class PointFilter:
         s = max(0.0, min(self.MAX_STRENGTH, strength)) / 100.0
         s1, extra = min(s, 1.0), max(0.0, s - 1.0)   # extra: 100을 넘는 '심한 떨림' 구간 (0~1)
         min_cutoff = 4.0 * (0.03 / 4.0) ** s1        # 4Hz(약) ~ 0.03Hz(강), 로그 보간
-        min_cutoff *= 1.0 - 0.6 * extra              # 200이면 0.012Hz까지
-        beta = 0.02 * (1.0 - 0.7 * s1) * (1.0 - 0.5 * extra)
+        min_cutoff *= 1.0 - 0.4 * extra              # 200이면 0.018Hz까지
+        beta = 0.02 * (1.0 - 0.7 * s1)               # 빠르게 움직일 땐 지연을 줄이는 정도는 유지
         for f in (self.fx, self.fy):
             f.min_cutoff, f.beta = min_cutoff, beta
-        self.deadband = 1.0 + 3.0 * s1 + 11.0 * extra   # 고무줄 반경(px): 4px(100) ~ 15px(200)
+        self.deadband = 1.0 + 3.0 * s1 + 6.0 * extra    # 부드러운 데드존 반경(px): 4px(100) ~ 10px(200)
 
     def reset(self):
         self.fx.reset()
@@ -80,7 +80,6 @@ class PointFilter:
             return self.out
         dx, dy = fx - self.out[0], fy - self.out[1]
         d = math.hypot(dx, dy)
-        if d > self.deadband:
-            k = (d - self.deadband) / d               # 반경 밖으로 나간 만큼만 따라간다
-            self.out = (self.out[0] + dx * k, self.out[1] + dy * k)
+        k = 1.0 if d >= self.deadband else (d / self.deadband) ** 2   # 작을수록 더 많이 줄인다 (끊김 없음)
+        self.out = (self.out[0] + dx * k, self.out[1] + dy * k)
         return self.out
