@@ -36,6 +36,7 @@ class Engine:
         self._drag_manual = False             # 제스처로 꾹 누르는 중
         self.scroll_anchor = None
         self._scroll_manual = False           # 제스처로 시작한 스크롤 (가운데 머물러도 안 끝남)
+        self.scroll_pick = False              # 툴바 '스크롤': 스크롤할 곳을 고르는 중
         self._scroll_still_since = None
         self.last_target = None               # 마지막으로 클릭한 지점
         self._last_set = None
