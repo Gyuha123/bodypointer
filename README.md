@@ -39,6 +39,7 @@ python -m venv .venv
 | `Ctrl+Alt+M` | 카메라 커서 끄기 / 켜기 |
 | `Ctrl+Alt+C` | 커서 고정 (상대 모드) |
 | `Ctrl+Alt+S` | 설정 창 열기 |
+| `Ctrl+Alt+Q` | 프로그램 종료 (툴바·웹 엔진까지 모두) |
 
 ## 하체 인식 안정화
 - 다리 부위는 더 정확한 포즈 모델(`pose_landmarker_full`)을 자동으로 사용

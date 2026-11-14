@@ -650,7 +650,8 @@ class SettingsPage(QWidget):
         keys = Card("단축키")
         for k, d in [("Pause  또는  Ctrl+Alt+P", "클릭 멈추기 / 다시 시작"), ("Ctrl+Alt+K", "키보드 열기 / 닫기"),
                      ("Ctrl+Alt+N", "다음 즐겨찾기 부위"), ("Ctrl+Alt+M", "카메라 커서 끄기 / 켜기"),
-                     ("Ctrl+Alt+C", "커서 고정 (상대 모드)"), ("Ctrl+Alt+S", "이 창 열기")]:
+                     ("Ctrl+Alt+C", "커서 고정 (상대 모드)"), ("Ctrl+Alt+S", "이 창 열기"),
+                     ("Ctrl+Alt+Q", "프로그램 종료")]:
             keys.add(row(label(k, "h2"), None, label(d, "muted")))
         lay.addWidget(keys)
         lay.addStretch()

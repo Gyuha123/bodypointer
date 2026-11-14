@@ -526,6 +526,8 @@ class App(QObject):
             self.show_window()
         elif name == "keyboard":
             self.toggle_keyboard()
+        elif name == "quit":
+            self.quit()
 
     def _popup_chosen(self, key):
         if key == "cancel":
