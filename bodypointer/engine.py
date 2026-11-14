@@ -200,7 +200,8 @@ class Engine:
         if self.paused and not own:
             self.dwell.reset()
             return
-        if self.mapper.clutched:
+        if self.mapper.clutched or self._drag_manual:
+            # 제스처로 꾹 누르는 동안에는 머무르기가 버튼을 놓지 않게 한다
             self.dwell.reset()
             return
         per_target = getattr(self.hooks, "dwell_time_for", None)
@@ -244,9 +245,7 @@ class Engine:
             self.drag_active = True
             self.hooks.alert("drag_start")
         elif action == "scroll":
-            self.scroll_anchor = pt
-            self._scroll_still_since = None
-            self.hooks.alert("scroll_start")
+            self.start_scroll(pt, manual=False)
 
     # ---------------- 스크롤 (FR-33) ----------------
     def _scroll_step(self, t: float):
@@ -258,11 +257,8 @@ class Engine:
         dead = max(self.settings.dwell_radius, 30)
         if abs(dy) <= dead:
             self._scroll_still_since = self._scroll_still_since or t
-            if t - self._scroll_still_since >= self.settings.dwell_time * 1.5:
-                self.scroll_anchor = None    # 가운데에 머물면 스크롤 종료
-                self.dwell.anchor = self.pos  # 바로 다음 Dwell이 이어서 발동하지 않도록
-                self.dwell.armed = False
-                self.hooks.alert("scroll_end")
+            if not self._scroll_manual and t - self._scroll_still_since >= self.settings.dwell_time * 1.5:
+                self.stop_scroll()            # 가운데에 머물면 스크롤 종료 (메뉴·툴바로 시작한 경우)
             return
         self._scroll_still_since = None
         if t - self._last_wheel >= 0.05:
@@ -285,8 +281,3 @@ class Engine:
             winmouse.wheel(direction)
             self._last_wheel = t
         return True
-
-    def scroll_last_target(self, notches: float):
-        """가상 스크롤 버튼: 마지막 클릭 지점의 창을 스크롤."""
-        target = self.last_target or (self.w / 2, self.h / 2)
-        winmouse.wheel_at(*target, notches)
