@@ -205,6 +205,7 @@ class Engine:
         return True
 
     def _after_move(self, t: float):
+        self._track_speed(t)
         if self.scroll_anchor is not None:
             self._scroll_step(t)
             return
