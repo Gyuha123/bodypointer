@@ -311,7 +311,8 @@ class App(QObject):
         need_frame = part.source == "pose" and lc is not None and t - lc > 1.5
         self.banner.set_sticky("frame", f"‘{part.name}’이(가) 잘 안 보여요 — 카메라를 낮추거나 조금 멀리 두세요"
                                if need_frame else None, "info")
-        self.banner.set_sticky("light", "너무 어두워요 — 조명을 밝혀 주세요" if res.low_light else None)
+        dark_hint = "너무 어두워요 — 조명을 밝히거나 머리 센서를 연결해 주세요"
+        self.banner.set_sticky("light", dark_hint if res.low_light and self.input_source == "camera" else None)
         self._update_ring(calibrating=cal is not None and cal.active)
         if t - self._status_t > 0.25:
             self._status_t = t
@@ -350,6 +351,13 @@ class App(QObject):
     def _update_status(self, res):
         e = self.engine
         part = get_part(self.settings.part_id).name
+        if self.input_source == "remote":
+            if e.paused:
+                title, sub, tone, mini = "클릭이 멈춰 있어요", "머리 센서로 커서만 움직여요", "accent", "일시정지 · 머리 센서"
+            else:
+                title, sub, tone, mini = "사용 중 · 머리 센서", "머리를 돌린 만큼 커서가 움직여요", "ok", "머리 센서"
+            self.window.set_status(title, sub, e.paused, tone, f"● {mini}")
+            return
         if not res.camera_ok:
             title, sub, tone, mini = "카메라를 찾고 있어요", "카메라 연결을 확인해 주세요.", "care", "카메라 없음"
         elif e.lost:
@@ -511,6 +519,164 @@ class App(QObject):
 
     def _update_status_now(self):
         self._status_t = 0
+
+    # ================= 머리 센서 리모컨 =================
+    def _remote_ready(self):
+        return self.remote.connected() and self.remote.state == "running" and bool(self.settings.remote_axes)
+
+    def _choose_source(self, cam_good, res, t):
+        """카메라와 머리 센서 중 무엇으로 커서를 움직일지 정한다."""
+        mode = self.settings.remote_mode
+        if mode == "off" or not self._remote_ready() or self._rcal is not None:
+            want = "camera"
+        elif mode == "always":
+            want = "remote"
+        else:
+            if cam_good:
+                self._cam_bad_since = None
+                self._cam_good_since = self._cam_good_since or t
+            else:
+                self._cam_good_since = None
+                self._cam_bad_since = self._cam_bad_since or t
+            if self.input_source == "camera":
+                want = "remote" if self._cam_bad_since is not None and t - self._cam_bad_since > 0.7 else "camera"
+            else:
+                want = "camera" if self._cam_good_since is not None and t - self._cam_good_since > 1.5 else "remote"
+        if res is not None:
+            self._remote_reason = ("카메라가 꺼져 있어서" if not res.camera_ok else "어두워서" if res.low_light
+                                   else f"‘{get_part(self.settings.part_id).name}’이(가) 안 보여서")
+        if want != self.input_source:
+            self._switch_source(want)
+
+    def _switch_source(self, new):
+        self.input_source = new
+        self.engine.dwell.reset()
+        if new == "remote":
+            self.banner.set_sticky("lost", None)
+            reason = self._remote_reason if self.settings.remote_mode == "auto" else ""
+            self.banner.flash(f"{reason} 머리 센서로 바꿨어요".strip(), "info", 3000)
+            self.say("머리 센서로 바꿨습니다")
+        else:
+            self.stabilizer.reset()
+            self.banner.flash("다시 카메라로 움직여요", "ok", 2000)
+            self.say("카메라로 돌아왔습니다")
+        self._status_t = 0
+        page = self.window.pages.get("settings")
+        if page is not None:
+            page.set_remote_status(self.remote_status_text())
+
+    def _on_remote_motion(self, t, deltas, rates):
+        if self._rcal is not None:                       # 방향 맞추는 중: 축별 각도만 모은다
+            for k in range(3):
+                self._rcal["sum"][k] += deltas[k]
+            return
+        axes = self.settings.remote_axes
+        if not axes:
+            return
+        if self.settings.remote_mode == "always" and self.input_source != "remote" and self._remote_ready():
+            self._switch_source("remote")
+        if self.input_source != "remote":
+            return
+        (xa, xs), (ya, ys) = axes["x"], axes["y"]
+        k = self.engine.w / 40.0 * self.settings.remote_speed       # 머리를 40° 돌리면 화면 끝까지
+        self.engine.on_delta(deltas[xa] * xs * k, deltas[ya] * ys * k, t)
+        self._pos_hist.append((t, self.engine.pos))
+        if self.settings.remote_nod_click and not self.engine.paused and not self.engine.lost:
+            if self.nod.update(rates[ya] * ys, rates[xa] * xs, t):
+                # 끄덕이는 동안 커서가 위아래로 흔들리므로, 끄덕이기 직전 위치를 클릭
+                before = [p for tt, p in self._pos_hist if tt <= t - 0.5]
+                target = before[-1] if before else self.engine.pos
+                self.engine.perform("left", target)
+                self.banner.flash("끄덕 → 클릭", "ok", 800)
+        self._update_ring()
+        e = self.engine
+        self.recorder.on_frame("head_remote", (e.pos[0] / e.w, e.pos[1] / e.h), e.pos, t, False, e.w)
+
+    def _on_remote_status(self, state, text):
+        self._remote_state_text = text
+        if state == "calibrating":
+            self.banner.flash(text, "info", 2500)
+        elif state == "running" and not self._remote_announced:
+            self._remote_announced = True
+            if self.settings.remote_axes:
+                self.banner.flash("머리 센서가 연결됐어요", "ok", 2000)
+                self.say("머리 센서가 연결됐습니다")
+            else:
+                self.banner.flash("머리 센서 연결됨 — 설정에서 ‘방향 맞추기’를 한 번 해 주세요", "info", 5000)
+                self.say("머리 센서가 연결됐습니다. 방향 맞추기를 해 주세요")
+        elif state in ("searching", "error", "off"):
+            self._remote_announced = False
+            if self.input_source == "remote":
+                self._switch_source("camera")
+        page = self.window.pages.get("settings") if hasattr(self, "window") else None
+        if page is not None:
+            page.set_remote_status(self.remote_status_text())
+
+    def remote_status_text(self):
+        if self.settings.remote_mode == "off":
+            return "사용 안 함"
+        text = getattr(self, "_remote_state_text", "") or "머리 센서를 찾는 중"
+        if self.remote.connected() and not self.settings.remote_axes:
+            text += " · 방향 맞추기가 필요해요"
+        if self.input_source == "remote":
+            text += " · 지금 머리 센서로 조작 중"
+        return text
+
+    def _ensure_remote(self):
+        if self.settings.remote_mode == "off":
+            if self.remote.isRunning():
+                self.remote._stop = True
+            if self.input_source == "remote":
+                self._switch_source("camera")
+            return
+        if not self.remote.isRunning():
+            self.remote = RemoteWorker()
+            self.remote.motion.connect(self._on_remote_motion)
+            self.remote.status.connect(self._on_remote_status)
+            self.remote.start()
+
+    def remote_recalibrate(self):
+        if not self.remote.connected():
+            self.banner.flash("머리 센서가 연결돼 있지 않아요", "info", 2000)
+            return
+        self.remote.recalibrate()
+
+    def start_remote_direction(self):
+        """방향 맞추기: 정면 → 오른쪽으로 돌리기 → 고개 숙이기. 어느 축이 좌우·위아래인지 찾는다."""
+        if not self.remote.connected():
+            self.banner.flash("머리 센서가 연결돼 있지 않아요", "info", 2500)
+            return
+        if self._rcal is not None:
+            return
+        self._rcal = {"sum": [0.0, 0.0, 0.0], "right": None}
+        self.banner.flash("정면을 보고 가만히 있어 주세요", "info", 1500)
+        self.say("정면을 봐 주세요")
+
+        def right_phase():
+            self._rcal["sum"] = [0.0, 0.0, 0.0]
+            self.banner.flash("고개를 오른쪽으로 천천히 돌리세요 →", "info", 2500)
+            self.say("오른쪽으로 돌리세요")
+
+        def down_phase():
+            self._rcal["right"] = list(self._rcal["sum"])
+            self._rcal["sum"] = [0.0, 0.0, 0.0]
+            self.banner.flash("이번엔 고개를 아래로 숙이세요 ↓", "info", 2500)
+            self.say("아래로 숙이세요")
+
+        def finish():
+            cal, self._rcal = self._rcal, None
+            axes = fit_axes(cal["right"] or [0, 0, 0], cal["sum"])
+            if axes is None:
+                self.banner.flash("움직임이 작았어요. 조금 더 크게 움직여 다시 해 주세요", "info", 3500)
+                self.say("다시 해 주세요")
+            else:
+                self.update("remote_axes", axes)
+                self.banner.flash("방향을 맞췄어요! 이제 머리 센서로 움직일 수 있어요", "ok", 3000)
+                self.say("방향을 맞췄습니다")
+
+        QTimer.singleShot(1200, right_phase)
+        QTimer.singleShot(3800, down_phase)
+        QTimer.singleShot(6400, finish)
 
     def toggle_keyboard(self):
         if self.keyboard.isVisible():
