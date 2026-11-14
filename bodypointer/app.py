@@ -386,6 +386,12 @@ class App(QObject):
             return
         if self.engine.paused and source == "gesture" and action_id not in ALLOWED_WHILE_PAUSED:
             return
+        if a.kind == "link":
+            lp = link_parts(action_id)
+            if lp:
+                webbrowser.open(lp[1])          # 기본 브라우저 (http/https 주소만 허용)
+                self.recorder.on_action("link", source)   # 기록에는 주소를 남기지 않는다
+            return
         for step in macro_steps(action_id):
             s = get_action(step)
             if s.kind == "keys":
