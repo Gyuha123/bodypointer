@@ -56,6 +56,79 @@ class PacketTest(unittest.TestCase):
         self.assertIn("running", states)
 
 
+class TimedSerial:
+    """펌웨어처럼 40ms마다 IMU 패킷 8개를 한꺼번에 내보내는 가짜 포트 (실제 시간 기준)."""
+
+    def __init__(self, bursts, interval=0.04):
+        import time
+        self.t0 = time.monotonic()
+        self.bursts, self.interval, self.sent = bursts, interval, 0
+        self.buf = bytearray()
+
+    @property
+    def in_waiting(self):
+        self._fill()
+        return len(self.buf)
+
+    def _fill(self):
+        import time
+        due = int((time.monotonic() - self.t0) / self.interval) + 1
+        while self.sent < min(due, len(self.bursts)):
+            self.buf += self.bursts[self.sent]
+            self.sent += 1
+
+    def read(self, n):
+        import time
+        self._fill()
+        if not self.buf:
+            time.sleep(0.002)
+            return b""
+        chunk, self.buf = bytes(self.buf[:n]), self.buf[n:]
+        return chunk
+
+
+class BatchSmoothingTest(unittest.TestCase):
+    def test_batched_packets_are_spread_out(self):
+        import time
+        bursts, i = [packet(2, bytes([0x70, 1]))], 0
+        for b in range(15):                                       # 0.6초 = 15묶음 × 8개, z축 50°/s
+            chunk = b""
+            for _ in range(8):
+                chunk += packet(1, struct.pack("<I6f", i * 5000, 0.0, 0.0, 50.0, 0, 0, 1))
+                i += 1
+            bursts.append(chunk)
+        w = RemoteWorker()
+        got = []
+        w.motion.connect(lambda t, d, r: got.append((t, d[2])))
+        old = remote.NO_DATA_TIMEOUT
+        remote.NO_DATA_TIMEOUT = 0.3
+        try:
+            w._read_loop(TimedSerial(bursts))
+        finally:
+            remote.NO_DATA_TIMEOUT = old
+        total = sum(d for _, d in got)
+        self.assertAlmostEqual(total, 50.0 * 119 * 0.005, delta=0.5)   # 각도는 빠짐없이
+        moving = [d for _, d in got if d > 0]
+        # 묶음(40ms)마다 한 번이 아니라, 그 사이에도 여러 번 나눠서 나온다 → 부드러운 이동
+        self.assertGreater(len(moving), 15 * 2)
+        self.assertLess(max(moving), 50.0 * 0.04 * 0.75)
+
+    def test_power_diagnostics(self):
+        flags = 1 | (9 << 8) | (3 << 16)                          # 블루투스 연결, 직전 리셋 = 저전압, 3회
+        data = packet(2, bytes([0x70, 1])) + packet(3, struct.pack("<5I", 200, 0, 200, 5000, flags))
+        w = RemoteWorker()
+        power = []
+        w.power.connect(lambda r, b: power.append((r, b)))
+        old = remote.NO_DATA_TIMEOUT
+        remote.NO_DATA_TIMEOUT = 0.1
+        try:
+            w._read_loop(FakeSerial(data))
+        finally:
+            remote.NO_DATA_TIMEOUT = old
+        self.assertEqual(power, [(9, 3)])
+        self.assertEqual(w.brownouts, 3)
+
+
 class AxesAndNodTest(unittest.TestCase):
     def test_fit_axes(self):
         axes = fit_axes([-2.0, 1.0, -35.0], [25.0, 3.0, 4.0])

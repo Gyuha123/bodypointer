@@ -154,6 +154,7 @@ class App(QObject):
         self.remote = RemoteWorker()
         self.remote.motion.connect(self._on_remote_motion)
         self.remote.status.connect(self._on_remote_status)
+        self.remote.power.connect(self._on_remote_power)
         if self.settings.remote_mode != "off":
             self.remote.start()
         tb.set_click_mode("menu" if self.settings.dwell_popup else self.settings.click_type)
@@ -664,7 +665,19 @@ class App(QObject):
             text += " · 방향 맞추기가 필요해요"
         if self.input_source == "remote":
             text += " · 지금 머리 센서로 조작 중"
+        if self.remote.connected() and self.remote.brownouts:
+            text += f" · ⚠ 전원 부족(저전압 리셋 {self.remote.brownouts}회)"
         return text
+
+    def _on_remote_power(self, reason, brownouts):
+        """머리 센서가 배터리 전원 부족으로 재부팅되면 알려 준다 (펌웨어 진단 정보)."""
+        if brownouts > 0 or reason == 9:
+            n = f" {brownouts}회" if brownouts else ""
+            self.banner.flash(f"머리 센서 전원이 부족해요(저전압 리셋{n}) — 배터리·배선을 확인해 주세요", "warn", 6000)
+            self.say("머리 센서 전원이 부족합니다", key="remote_power", every=120)
+        page = self.window.pages.get("settings")
+        if page is not None:
+            page.set_remote_status(self.remote_status_text())
 
     def _ensure_remote(self):
         if self.settings.remote_mode == "off":
@@ -677,6 +690,7 @@ class App(QObject):
             self.remote = RemoteWorker()
             self.remote.motion.connect(self._on_remote_motion)
             self.remote.status.connect(self._on_remote_status)
+            self.remote.power.connect(self._on_remote_power)
             self.remote.start()
 
     def remote_recalibrate(self):
