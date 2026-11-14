@@ -5,7 +5,7 @@ import time
 from collections import Counter
 from pathlib import Path
 
-from PySide6.QtCore import QLocale, QObject, QPoint, QTimer, Signal
+from PySide6.QtCore import QLocale, QObject, QPoint, Qt, QTimer, Signal
 from PySide6.QtWidgets import QAbstractButton, QApplication, QDialog, QHBoxLayout, QMessageBox, QVBoxLayout
 
 from . import profile, vision, winmouse
