@@ -244,6 +244,12 @@ class Engine:
         per_target = getattr(self.hooks, "dwell_time_for", None)
         self.dwell.dwell_time = per_target(own) if per_target else self.settings.dwell_time
         fired = self.dwell.update(self.pos, t)
+        if fired and getattr(self.settings, "tremor_assist", False) and self._speed > self.CLICK_MAX_DRIFT:
+            # 아직 이동 중(천천히 미는 중)이면 클릭을 미루고, 멈추는 순간 바로 누를 수 있게 게이지를 거의 찬 상태로 둔다
+            fired = None
+            self.dwell.armed = True
+            self.dwell.start = t - self.dwell.dwell_time * 0.95
+            self.dwell.progress = 0.95
         was_locked = self._locked
         self._update_lock(t)
         if self._locked:
