@@ -1,5 +1,6 @@
 """앱 컨트롤러: 비전 → 안정화 → 엔진 → UI를 잇고, 기록·추천·제스처·키보드를 관리한다."""
 import atexit
+import os
 import time
 from collections import Counter
 from pathlib import Path
