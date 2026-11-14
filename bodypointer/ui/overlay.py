@@ -89,28 +89,28 @@ class CursorRing(QWidget):
             p.end()
             return
 
-        r = 26
+        r = self.R
         rect = QRectF(c.x() - r, c.y() - r, 2 * r, 2 * r)
         if st.get("lost"):
             red = QColor("#EF4444")
-            p.setPen(QPen(red, 5))
+            p.setPen(QPen(red, 4))
             p.drawEllipse(rect)
-            p.drawLine(QPointF(c.x() - 11, c.y() - 11), QPointF(c.x() + 11, c.y() + 11))
-            p.drawLine(QPointF(c.x() + 11, c.y() - 11), QPointF(c.x() - 11, c.y() + 11))
+            p.drawLine(QPointF(c.x() - 8, c.y() - 8), QPointF(c.x() + 8, c.y() + 8))
+            p.drawLine(QPointF(c.x() + 8, c.y() - 8), QPointF(c.x() - 8, c.y() + 8))
         elif st.get("paused"):
-            p.setPen(QPen(QColor(110, 116, 128, 200), 3, Qt.PenStyle.DashLine))
+            p.setPen(QPen(QColor(110, 116, 128, 210), 2.5, Qt.PenStyle.DashLine))
             p.drawEllipse(rect)
         else:
             # 어떤 배경에서도 보이도록 흰 링 + 얇은 어두운 테두리
-            p.setPen(QPen(QColor(0, 0, 0, 70), 9))
+            p.setPen(QPen(QColor(0, 0, 0, 80), 7))
             p.drawEllipse(rect)
-            p.setPen(QPen(QColor(255, 255, 255, 220), 5))
+            p.setPen(QPen(QColor(255, 255, 255, 230), 4))
             p.drawEllipse(rect)
 
         prog = st.get("progress", 0)
         if prog > 0 and not st.get("lost"):
             col = COLORS.get(st.get("color_key", "left"), COLORS["left"])
-            p.setPen(QPen(col, 6, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            p.setPen(QPen(col, 5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
             p.drawArc(rect, 90 * 16, -int(360 * 16 * prog))
 
         text = "드래그 중" if st.get("drag") else "커서 고정" if st.get("clutched") else ""
@@ -118,7 +118,7 @@ class CursorRing(QWidget):
             f = theme.ui_font(13, QFont.Weight.Bold)
             p.setFont(f)
             w = QFontMetrics(f).horizontalAdvance(text) + 20
-            br = QRectF(c.x() - w / 2, c.y() + r + 8, w, 26)
+            br = QRectF(c.x() - w / 2, c.y() + r + 6, w, 26)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor(22, 24, 29, 220))
             p.drawRoundedRect(br, 13, 13)

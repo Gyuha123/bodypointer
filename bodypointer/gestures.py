@@ -27,7 +27,7 @@ GESTURES: dict[str, Gesture] = {g.id: g for g in [
     Gesture("mouth_open", "입 벌리기", "입을 크게 벌렸다 다무세요", 0.45),
     Gesture("smile", "활짝 웃기", "입꼬리를 올려 활짝 웃으세요", 0.6),
     Gesture("pucker", "입술 내밀기", "뽀뽀하듯 입술을 내미세요", 0.6),
-    Gesture("long_blink", "눈 지그시 감기", "두 눈을 1초 동안 감았다 뜨세요", 0.6, 0.9),
+    Gesture("long_blink", "눈 2초 감기", "두 눈을 2초 동안 감았다 뜨세요", 0.6, 2.0),
 ]}
 GESTURE_ORDER = ["brow_raise", "mouth_open", "smile", "long_blink", "pucker"]
 
