@@ -268,6 +268,17 @@ class EngineTest(unittest.TestCase):
         self.e.stop_scroll()
         self.assertIsNone(self.e.scroll_anchor)
 
+    def test_overlapping_clicks_are_not_double_click(self):
+        """머무르기 클릭과 표정 클릭이 거의 동시에 겹쳐도 한 번만 누른다 (더블클릭 오인 방지)."""
+        self.e.perform("left", (500, 500))
+        self.e.perform("left", (502, 501))            # 0.6초 안에 또 → 버림
+        self.assertEqual(self.mouse.count("left_click"), 1)
+        self.e._last_left_click -= 1.0                 # 1초 지난 것으로
+        self.e.perform("left", (500, 500))
+        self.assertEqual(self.mouse.count("left_click"), 2)
+        self.e.perform("double", (500, 500))           # 일부러 고른 더블클릭은 그대로
+        self.assertEqual(self.mouse.count("double_click"), 1)
+
     def test_tremor_click_lands_on_target(self):
         """떨림 클릭 보조: 떨리는 손으로도 머무르기 클릭이 되고, 목표 근처를 누른다."""
         random.seed(5)

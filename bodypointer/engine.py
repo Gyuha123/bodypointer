@@ -8,6 +8,7 @@ UI와는 hooks 객체로만 연결한다 (모듈 분리, §5):
   hooks.alert(kind: str)              lost / found / paused / resumed / override / drag_start ...
 """
 import math
+import time
 from collections import deque
 
 from . import winmouse
@@ -41,6 +42,7 @@ class Engine:
         self._locked = False                  # 떨림 클릭 보조로 커서를 붙잡고 있는지
         self._speed = 0.0                     # 최근 0.4초 동안의 순이동 속도 (px/s)
         self._hist = deque()
+        self._last_left_click = -1e9
         self._unlock_t, self._unlock_from = -1e9, None
         self._scroll_still_since = None
         self.last_target = None               # 마지막으로 클릭한 지점
