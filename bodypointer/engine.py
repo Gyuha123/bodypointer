@@ -101,9 +101,52 @@ class Engine:
         if self.drag_active:
             winmouse.left_up()
             self.drag_active = False
+        self._drag_manual = False
         self.scroll_anchor = None
+        self._scroll_manual = False
         if self.hooks.popup_visible():
             self.hooks.hide_popup()
+
+    # ---------------- 제스처로 하는 스크롤·꾹 누르기 ----------------
+    def start_scroll(self, anchor=None, manual=True):
+        """휠 버튼을 누른 것처럼: 기준점에서 위·아래로 움직인 만큼 스크롤.
+        manual=True 이면 가운데에 머물러도 끝나지 않고 stop_scroll()로만 끝난다 (제스처용)."""
+        if self.scroll_anchor is not None:
+            return
+        self.scroll_anchor = anchor or self.pos
+        self._scroll_manual = manual
+        self._scroll_still_since = None
+        self.hooks.alert("scroll_start")
+
+    def stop_scroll(self):
+        if self.scroll_anchor is None:
+            return
+        self.scroll_anchor = None
+        self._scroll_manual = False
+        self.dwell.anchor = self.pos          # 끝나자마자 머무르기 클릭이 이어지지 않도록
+        self.dwell.armed = False
+        self.hooks.alert("scroll_end")
+
+    def press_hold(self):
+        """지금 커서 위치에서 왼쪽 버튼을 꾹 누른 상태로 (드래그 시작)."""
+        if self.drag_active:
+            return
+        self.last_target = self.pos
+        winmouse.left_down()
+        self.drag_active = True
+        self._drag_manual = True
+        self._emit("click", "drag", self.pos)
+        self.hooks.alert("drag_start")
+
+    def release_hold(self):
+        if not self.drag_active:
+            return
+        winmouse.left_up()
+        self.drag_active = False
+        self._drag_manual = False
+        self.dwell.anchor = self.pos
+        self.dwell.armed = False
+        self.hooks.alert("drag_end")
 
     # ---------------- 프레임 처리 ----------------
     def on_point(self, pt, t: float):
