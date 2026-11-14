@@ -293,7 +293,9 @@ class Engine:
         if self._locked:
             if self._speed > self.UNLOCK_DRIFT or math.dist(self.pos, d.anchor) > d.radius * 0.75:
                 self._locked = False
-        elif d.progress >= self.LOCK_AT and self._speed < self.LOCK_DRIFT:
+        elif d.progress >= self.LOCK_AT and self._speed < self.LOCK_DRIFT \
+                and math.dist(self.pos, d.anchor) < max(6.0, d.radius * 0.15):
+            # 이미 기준점 바로 근처에 있을 때만 붙잡는다 → 붙잡는 순간 커서가 당겨지지 않는다
             self._locked = True
 
     @property
