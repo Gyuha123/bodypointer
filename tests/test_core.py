@@ -221,6 +221,21 @@ class EngineTest(unittest.TestCase):
         self.e.stop_scroll()
         self.assertIsNone(self.e.scroll_anchor)
 
+    def test_scroll_pick_targets_where_user_dwells(self):
+        """툴바 '스크롤' → 다음에 머무른 곳에서 스크롤 시작 (일시정지 중·BodyPointer 창 위에서도)."""
+        self.e.last_target = (100, 100)            # 예전 클릭 위치 (다른 창) — 여기로 가면 안 됨
+        self.hooks.own = True                      # 설정 창 위
+        self.e.scroll_pick = True
+        self.run_still(1.5, (0.6, 0.6))
+        self.assertFalse(self.e.scroll_pick)
+        self.assertIsNotNone(self.e.scroll_anchor)
+        self.assertNotEqual(self.e.scroll_anchor, (100, 100))
+        self.assertNotIn("ui_dwell", self.hooks.alerts)    # 버튼을 누르지 않고 스크롤만 시작
+        anchor = self.e.scroll_anchor
+        self.run_still(0.5, (0.6, 0.85))           # 아래로 움직이면 그 자리에서 아래로 스크롤
+        self.assertEqual(self.mouse.pos, (int(round(anchor[0])), int(round(anchor[1]))))
+        self.assertTrue(any(c[0] == "wheel" and c[1][0] < 0 for c in self.mouse.calls))
+
     def test_scroll_mode(self):
         self.e.set_paused(False)
         self.e.perform("scroll", (960, 540))
