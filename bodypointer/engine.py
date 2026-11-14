@@ -160,15 +160,31 @@ class Engine:
                 self.hooks.alert("lost")
                 self._emit("lost")
             return
+        if not self._begin_frame(t):
+            return
+        self.pos = self.mapper.update(pt[0], pt[1], t)
+        self._after_move(t)
+
+    def on_delta(self, dx: float, dy: float, t: float):
+        """머리 센서처럼 '움직인 양(px)'만 주는 입력. 카메라 입력과 같은 클릭·스크롤 처리를 쓴다."""
+        if not self._begin_frame(t):
+            return
+        if not self.mapper.clutched:
+            x = min(max(self.pos[0] + dx, 0), self.w - 1)
+            y = min(max(self.pos[1] + dy, 0), self.h - 1)
+            self.pos = (x, y)
+        self.mapper.reset(cursor=self.pos)   # 카메라(상대 모드)로 돌아갈 때 이어지도록
+        self._after_move(t)
+
+    def _begin_frame(self, t: float) -> bool:
+        """추적 복귀·커서 제어 여부·실제 마우스 양보를 처리. 계속 진행하면 True."""
         if self.lost:
             self.lost = False
             self.mapper.reset(cursor=self.pos)
             self.hooks.alert("found")
         self.last_seen = t
-
         if not self.control_enabled:
-            return
-
+            return False
         # 보호자/사용자가 실제 마우스를 움직이면 잠시 양보
         cur = winmouse.get_pos()
         if self._last_set and self.scroll_anchor is None and math.dist(cur, self._last_set) > 40:
@@ -180,13 +196,12 @@ class Engine:
             self.pos = cur
             self.mapper.reset(cursor=cur)
             self.dwell.reset()
-            return
-
+            return False
         if self.clutch_until and t >= self.clutch_until:
             self.toggle_clutch(t)
+        return True
 
-        self.pos = self.mapper.update(pt[0], pt[1], t)
-
+    def _after_move(self, t: float):
         if self.scroll_anchor is not None:
             self._scroll_step(t)
             return
