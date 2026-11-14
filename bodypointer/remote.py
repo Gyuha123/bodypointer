@@ -105,6 +105,7 @@ class RemoteWorker(QThread):
         self.last_rx = 0.0
         self.reset_reason = None
         self.brownouts = 0
+        self.firmware = None             # 연동판 펌웨어 버전 (type 4 식별 패킷), 예: "2.0"
 
     # ---- 메인 스레드에서 ----
     def recalibrate(self):
@@ -157,8 +158,9 @@ class RemoteWorker(QThread):
                     continue
                 self._ser = ser
                 self.transport = kind
+                self.firmware = None
                 try:
-                    ser.write(b"b")
+                    ser.write(b"bi")                 # 바이너리 모드 + 식별 요청 (연동판 펌웨어가 버전으로 답함)
                     ok = self._read_loop(ser)
                 except Exception:
                     ok = False
@@ -233,6 +235,10 @@ class RemoteWorker(QThread):
                         self._set("running", f"머리 센서 연결됨 ({self.transport})")
                     else:
                         self._set("error", "머리 센서 오류 — 센서 배선을 확인해 주세요")
+                elif typ == 4 and ln == 4 and payload[:2] == b"BP":
+                    self.firmware = f"{payload[2]}.{payload[3]}"
+                    if self.state == "running":
+                        self._set("running", self._connected_text())
                 elif typ == 3 and ln >= 20:
                     flags = struct.unpack("<I", payload[16:20])[0]
                     reason, brownouts = (flags >> 8) & 0xFF, flags >> 16
