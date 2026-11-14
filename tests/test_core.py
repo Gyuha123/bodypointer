@@ -299,7 +299,10 @@ class EngineTest(unittest.TestCase):
             xs.append(self.mouse.pos[0])
         frozen = max(len(list(g)) for _, g in __import__("itertools").groupby(xs))
         self.assertLessEqual(frozen, 3)            # 같은 자리에 멈춰 있는 프레임이 길게 이어지지 않음
-        self.assertLess(max(b - a for a, b in zip(xs, xs[1:])), 15)   # 확 튀지 않음
+        self.assertLess(max(abs(b - a) for a, b in zip(xs, xs[1:])), 6)   # 확 튀지 않음
+        self.assertEqual(self.mouse.count("left_click"), 0)              # 천천히 이동 중엔 클릭하지 않음
+        self.run_still(1.0, (0.5 + 119 * 0.0004, 0.5))                   # 멈추면 곧바로 클릭
+        self.assertEqual(self.mouse.count("left_click"), 1)
 
     def test_scroll_pick_targets_where_user_dwells(self):
         """툴바 '스크롤' → 다음에 머무른 곳에서 스크롤 시작 (일시정지 중·BodyPointer 창 위에서도)."""

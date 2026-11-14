@@ -271,6 +271,7 @@ class Engine:
     UNLOCK_DRIFT = 70.0       # 이보다 빨리 이동하기 시작하면 놓는다
     DRIFT_WINDOW = 0.4        # 떨림은 제자리 왕복이라 이 구간의 '순이동'이 작고, 일부러 움직이면 크다
     RELEASE_BLEND = 0.2
+    CLICK_MAX_DRIFT = 40.0    # 떨림 보조: 이보다 빠르게 이동 중이면 클릭하지 않는다
 
     def _move_cursor(self, p):
         winmouse.move(*p)
