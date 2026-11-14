@@ -401,6 +401,20 @@ class GesturePage(QWidget):
         lay.addWidget(quick)
         lay.addStretch()
 
+    @staticmethod
+    def _action_combo():
+        """동작 고르기: 마우스 / 편집 / 탐색 / 앱 묶음으로 보여 준다."""
+        cb = QComboBox()
+        cb.setMinimumWidth(280)
+        cb.addItem("사용 안 함", "")
+        for group in GROUP_ORDER:
+            cb.addItem(f"── {group} ──", None)
+            cb.model().item(cb.count() - 1).setEnabled(False)
+            for a in ACTIONS.values():
+                if a.group == group:
+                    cb.addItem(a.label, a.id)
+        return cb
+
     def refresh(self):
         s = self.app.settings
         for gid, cb in self.combos.items():
@@ -411,14 +425,29 @@ class GesturePage(QWidget):
                 cb.addItem(a.label if a else aid, aid)
                 idx = cb.count() - 1
             cb.setCurrentIndex(max(idx, 0))
+            personal = gid in s.gesture_thresholds
+            self.cal_btns[gid].setText("다시 맞추기" if personal else "내 표정으로 맞추기")
         self.sens.set_value(s.gesture_sensitivity)
         self.auto.set_checked(s.auto_quick)
         qa = [get_action(a).label for a in self.app.quick_actions() if get_action(a)]
         self.quick_label.setText("지금 툴바: " + (", ".join(qa) if qa else "아직 없어요"))
 
-    def update_live(self, detector):
+    def update_live(self, detector, now, cal_status):
+        holding = detector.holding()
         for gid, m in self.meters.items():
             m.set(detector.scores.get(gid, 0.0), detector.threshold(gid))
+            if gid in cal_status:
+                text = cal_status[gid]
+            elif gid in holding:
+                text = "● 유지하는 중"
+            elif now - detector.last_event.get(gid, -1e9) < 1.0:
+                text = "● 인식됐어요!"
+            elif gid in self.app.settings.gesture_thresholds:
+                text = "내 표정에 맞춘 기준 사용 중"
+            else:
+                text = ""
+            if self.status[gid].text() != text:
+                self.status[gid].setText(text)
 
 
 class StatsPage(QWidget):
