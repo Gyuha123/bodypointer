@@ -204,6 +204,7 @@ class App(QObject):
                 child.click()
             return
         winmouse.left_click()      # 설정 창·마법사는 실제 클릭으로 조작
+        self.engine.last_target = pt   # BodyPointer 창을 누른 것도 '마지막으로 클릭한 곳'으로 기록
 
     def popup_visible(self):
         return self.popup.isVisible()
@@ -332,14 +333,25 @@ class App(QObject):
             self._update_status(res)
 
     def _toolbar_scroll(self):
-        """툴바 '스크롤': 마지막으로 클릭한 곳(없으면 화면 가운데)에서 스크롤 모드 시작/끝."""
+        """툴바 '스크롤': 스크롤할 곳을 직접 고르게 한다 (다음에 머무른 곳에서 스크롤 모드 시작).
+        스크롤 중이면 끝내고, 고르는 중이면 취소한다."""
         e = self.engine
         if e.scroll_anchor is not None:
             e.stop_scroll()
-            return
-        anchor = e.last_target or (e.w / 2, e.h / 2)
-        winmouse.move(*anchor)
-        e.start_scroll(anchor, manual=False)
+        elif e.scroll_pick:
+            e.scroll_pick = False
+            self.banner.set_sticky("scroll_pick", None)
+            self.banner.flash("스크롤을 취소했어요", "info", 1200)
+        else:
+            e.scroll_pick = True
+            e.dwell.reset()
+            self.banner.set_sticky("scroll_pick", "스크롤할 곳에 잠시 머무르세요 — 취소: 툴바 ‘스크롤’ 다시 누르기", "info")
+            self.say("스크롤할 곳에 머무르세요")
+        self._sync_scroll_button()
+
+    def _sync_scroll_button(self):
+        e = self.engine
+        self.toolbar.scroll_btn.setChecked(e.scroll_pick or e.scroll_anchor is not None)
 
     def _update_ring(self, calibrating=False):
         e = self.engine
